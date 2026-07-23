@@ -1,4 +1,4 @@
-/******************
+/*****************************
  * Documentation : 
  * https://www.masswerk.at/6502/6502_instruction_set.html
  * https://www.nesdev.org/wiki/Instruction_reference
@@ -7,8 +7,6 @@
 // ============================================================================
 // ENUMS
 // ============================================================================
-
-use std::hint;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Instruction {
@@ -386,7 +384,7 @@ pub const OPCODE_TABLE: [OpcodeInfo; 256] = [
 ];
 
 // ============================================================================
-// CPU Implementation
+// 6502 CPU Implementation
 // ============================================================================
 impl Cpu {
     pub fn init() -> Cpu {
@@ -439,6 +437,21 @@ impl Cpu {
         }
     }
 
+    // --- Stack ---
+
+    fn push(&mut self, value: u8) {
+        let address = 0x0100 + self.sp as u16;
+        self.write_bus(address, value);
+        self.sp = self.sp.wrapping_sub(1);
+    }
+
+    fn pull(&mut self) -> u8 {
+        self.sp = self.sp.wrapping_add(1);
+        let address = 0x0100 + self.sp as u16;
+
+        self.read_bus(address)
+    }
+
     // --- Execute ---
     
     pub fn execute(&mut self) {
@@ -449,275 +462,275 @@ impl Cpu {
         
         match (info.instruction, info.mode) {
             // ADC
-            (Instruction::ADC, AddressingMode::Immediate) => self.adc_immediate(),
-            (Instruction::ADC, AddressingMode::ZeroPage) => self.adc_zeropage(),
-            (Instruction::ADC, AddressingMode::ZeroPageX) => self.adc_zeropagex(),
-            (Instruction::ADC, AddressingMode::Absolute) => self.adc_absolute(),
-            (Instruction::ADC, AddressingMode::AbsoluteX) => self.adc_absolutex(),
-            (Instruction::ADC, AddressingMode::AbsoluteY) => self.adc_absolutey(),
-            (Instruction::ADC, AddressingMode::IndirectX) => self.adc_indirectx(),
-            (Instruction::ADC, AddressingMode::IndirectY) => self.adc_indirecty(),
+            (Instruction::ADC, AddressingMode::Immediate) => self.adc_immediate(info),
+            (Instruction::ADC, AddressingMode::ZeroPage) => self.adc_zeropage(info),
+            (Instruction::ADC, AddressingMode::ZeroPageX) => self.adc_zeropagex(info),
+            (Instruction::ADC, AddressingMode::Absolute) => self.adc_absolute(info),
+            (Instruction::ADC, AddressingMode::AbsoluteX) => self.adc_absolutex(info),
+            (Instruction::ADC, AddressingMode::AbsoluteY) => self.adc_absolutey(info),
+            (Instruction::ADC, AddressingMode::IndirectX) => self.adc_indirectx(info),
+            (Instruction::ADC, AddressingMode::IndirectY) => self.adc_indirecty(info),
             
             // AND
-            (Instruction::AND, AddressingMode::Immediate) => self.and_immediate(),
-            (Instruction::AND, AddressingMode::ZeroPage) => self.and_zeropage(),
-            (Instruction::AND, AddressingMode::ZeroPageX) => self.and_zeropagex(),
-            (Instruction::AND, AddressingMode::Absolute) => self.and_absolute(),
-            (Instruction::AND, AddressingMode::AbsoluteX) => self.and_absolutex(),
-            (Instruction::AND, AddressingMode::AbsoluteY) => self.and_absolutey(),
-            (Instruction::AND, AddressingMode::IndirectX) => self.and_indirectx(),
-            (Instruction::AND, AddressingMode::IndirectY) => self.and_indirecty(),
+            (Instruction::AND, AddressingMode::Immediate) => self.and_immediate(info),
+            (Instruction::AND, AddressingMode::ZeroPage) => self.and_zeropage(info),
+            (Instruction::AND, AddressingMode::ZeroPageX) => self.and_zeropagex(info),
+            (Instruction::AND, AddressingMode::Absolute) => self.and_absolute(info),
+            (Instruction::AND, AddressingMode::AbsoluteX) => self.and_absolutex(info),
+            (Instruction::AND, AddressingMode::AbsoluteY) => self.and_absolutey(info),
+            (Instruction::AND, AddressingMode::IndirectX) => self.and_indirectx(info),
+            (Instruction::AND, AddressingMode::IndirectY) => self.and_indirecty(info),
             
             // ASL
-            (Instruction::ASL, AddressingMode::Accumulator) => self.asl_accumulator(),
-            (Instruction::ASL, AddressingMode::ZeroPage) => self.asl_zeropage(),
-            (Instruction::ASL, AddressingMode::ZeroPageX) => self.asl_zeropagex(),
-            (Instruction::ASL, AddressingMode::Absolute) => self.asl_absolute(),
-            (Instruction::ASL, AddressingMode::AbsoluteX) => self.asl_absolutex(),
+            (Instruction::ASL, AddressingMode::Accumulator) => self.asl_accumulator(info),
+            (Instruction::ASL, AddressingMode::ZeroPage) => self.asl_zeropage(info),
+            (Instruction::ASL, AddressingMode::ZeroPageX) => self.asl_zeropagex(info),
+            (Instruction::ASL, AddressingMode::Absolute) => self.asl_absolute(info),
+            (Instruction::ASL, AddressingMode::AbsoluteX) => self.asl_absolutex(info),
             
             // BCC
-            (Instruction::BCC, AddressingMode::Relative) => self.bcc_relative(),
+            (Instruction::BCC, AddressingMode::Relative) => self.bcc_relative(info),
             
             // BCS
-            (Instruction::BCS, AddressingMode::Relative) => self.bcs_relative(),
+            (Instruction::BCS, AddressingMode::Relative) => self.bcs_relative(info),
             
             // BEQ
-            (Instruction::BEQ, AddressingMode::Relative) => self.beq_relative(),
+            (Instruction::BEQ, AddressingMode::Relative) => self.beq_relative(info),
             
             // BIT
-            (Instruction::BIT, AddressingMode::ZeroPage) => self.bit_zeropage(),
-            (Instruction::BIT, AddressingMode::Absolute) => self.bit_absolute(),
+            (Instruction::BIT, AddressingMode::ZeroPage) => self.bit_zeropage(info),
+            (Instruction::BIT, AddressingMode::Absolute) => self.bit_absolute(info),
             
             // BMI
-            (Instruction::BMI, AddressingMode::Relative) => self.bmi_relative(),
+            (Instruction::BMI, AddressingMode::Relative) => self.bmi_relative(info),
             
             // BNE
-            (Instruction::BNE, AddressingMode::Relative) => self.bne_relative(),
+            (Instruction::BNE, AddressingMode::Relative) => self.bne_relative(info),
             
             // BPL
-            (Instruction::BPL, AddressingMode::Relative) => self.bpl_relative(),
+            (Instruction::BPL, AddressingMode::Relative) => self.bpl_relative(info),
             
             // BRK
-            (Instruction::BRK, AddressingMode::Implicit) => self.brk_implicit(),
+            (Instruction::BRK, AddressingMode::Implicit) => self.brk_implicit(info),
             
             // BVC
-            (Instruction::BVC, AddressingMode::Relative) => self.bvc_relative(),
+            (Instruction::BVC, AddressingMode::Relative) => self.bvc_relative(info),
             
             // BVS
-            (Instruction::BVS, AddressingMode::Relative) => self.bvs_relative(),
+            (Instruction::BVS, AddressingMode::Relative) => self.bvs_relative(info),
             
             // CLC
-            (Instruction::CLC, AddressingMode::Implicit) => self.clc_implicit(),
+            (Instruction::CLC, AddressingMode::Implicit) => self.clc_implicit(info),
             
             // CLD
-            (Instruction::CLD, AddressingMode::Implicit) => self.cld_implicit(),
+            (Instruction::CLD, AddressingMode::Implicit) => self.cld_implicit(info),
             
             // CLI
-            (Instruction::CLI, AddressingMode::Implicit) => self.cli_implicit(),
+            (Instruction::CLI, AddressingMode::Implicit) => self.cli_implicit(info),
             
             // CLV
-            (Instruction::CLV, AddressingMode::Implicit) => self.clv_implicit(),
+            (Instruction::CLV, AddressingMode::Implicit) => self.clv_implicit(info),
             
             // CMP
-            (Instruction::CMP, AddressingMode::Immediate) => self.cmp_immediate(),
-            (Instruction::CMP, AddressingMode::ZeroPage) => self.cmp_zeropage(),
-            (Instruction::CMP, AddressingMode::ZeroPageX) => self.cmp_zeropagex(),
-            (Instruction::CMP, AddressingMode::Absolute) => self.cmp_absolute(),
-            (Instruction::CMP, AddressingMode::AbsoluteX) => self.cmp_absolutex(),
-            (Instruction::CMP, AddressingMode::AbsoluteY) => self.cmp_absolutey(),
-            (Instruction::CMP, AddressingMode::IndirectX) => self.cmp_indirectx(),
-            (Instruction::CMP, AddressingMode::IndirectY) => self.cmp_indirecty(),
+            (Instruction::CMP, AddressingMode::Immediate) => self.cmp_immediate(info),
+            (Instruction::CMP, AddressingMode::ZeroPage) => self.cmp_zeropage(info),
+            (Instruction::CMP, AddressingMode::ZeroPageX) => self.cmp_zeropagex(info),
+            (Instruction::CMP, AddressingMode::Absolute) => self.cmp_absolute(info),
+            (Instruction::CMP, AddressingMode::AbsoluteX) => self.cmp_absolutex(info),
+            (Instruction::CMP, AddressingMode::AbsoluteY) => self.cmp_absolutey(info),
+            (Instruction::CMP, AddressingMode::IndirectX) => self.cmp_indirectx(info),
+            (Instruction::CMP, AddressingMode::IndirectY) => self.cmp_indirecty(info),
             
             // CPX
-            (Instruction::CPX, AddressingMode::Immediate) => self.cpx_immediate(),
-            (Instruction::CPX, AddressingMode::ZeroPage) => self.cpx_zeropage(),
-            (Instruction::CPX, AddressingMode::Absolute) => self.cpx_absolute(),
+            (Instruction::CPX, AddressingMode::Immediate) => self.cpx_immediate(info),
+            (Instruction::CPX, AddressingMode::ZeroPage) => self.cpx_zeropage(info),
+            (Instruction::CPX, AddressingMode::Absolute) => self.cpx_absolute(info),
             
             // CPY
-            (Instruction::CPY, AddressingMode::Immediate) => self.cpy_immediate(),
-            (Instruction::CPY, AddressingMode::ZeroPage) => self.cpy_zeropage(),
-            (Instruction::CPY, AddressingMode::Absolute) => self.cpy_absolute(),
+            (Instruction::CPY, AddressingMode::Immediate) => self.cpy_immediate(info),
+            (Instruction::CPY, AddressingMode::ZeroPage) => self.cpy_zeropage(info),
+            (Instruction::CPY, AddressingMode::Absolute) => self.cpy_absolute(info),
             
             // DEC
-            (Instruction::DEC, AddressingMode::ZeroPage) => self.dec_zeropage(),
-            (Instruction::DEC, AddressingMode::ZeroPageX) => self.dec_zeropagex(),
-            (Instruction::DEC, AddressingMode::Absolute) => self.dec_absolute(),
-            (Instruction::DEC, AddressingMode::AbsoluteX) => self.dec_absolutex(),
+            (Instruction::DEC, AddressingMode::ZeroPage) => self.dec_zeropage(info),
+            (Instruction::DEC, AddressingMode::ZeroPageX) => self.dec_zeropagex(info),
+            (Instruction::DEC, AddressingMode::Absolute) => self.dec_absolute(info),
+            (Instruction::DEC, AddressingMode::AbsoluteX) => self.dec_absolutex(info),
             
             // DEX
-            (Instruction::DEX, AddressingMode::Implicit) => self.dex_implicit(),
+            (Instruction::DEX, AddressingMode::Implicit) => self.dex_implicit(info),
             
             // DEY
-            (Instruction::DEY, AddressingMode::Implicit) => self.dey_implicit(),
+            (Instruction::DEY, AddressingMode::Implicit) => self.dey_implicit(info),
             
             // EOR
-            (Instruction::EOR, AddressingMode::Immediate) => self.eor_immediate(),
-            (Instruction::EOR, AddressingMode::ZeroPage) => self.eor_zeropage(),
-            (Instruction::EOR, AddressingMode::ZeroPageX) => self.eor_zeropagex(),
-            (Instruction::EOR, AddressingMode::Absolute) => self.eor_absolute(),
-            (Instruction::EOR, AddressingMode::AbsoluteX) => self.eor_absolutex(),
-            (Instruction::EOR, AddressingMode::AbsoluteY) => self.eor_absolutey(),
-            (Instruction::EOR, AddressingMode::IndirectX) => self.eor_indirectx(),
-            (Instruction::EOR, AddressingMode::IndirectY) => self.eor_indirecty(),
+            (Instruction::EOR, AddressingMode::Immediate) => self.eor_immediate(info),
+            (Instruction::EOR, AddressingMode::ZeroPage) => self.eor_zeropage(info),
+            (Instruction::EOR, AddressingMode::ZeroPageX) => self.eor_zeropagex(info),
+            (Instruction::EOR, AddressingMode::Absolute) => self.eor_absolute(info),
+            (Instruction::EOR, AddressingMode::AbsoluteX) => self.eor_absolutex(info),
+            (Instruction::EOR, AddressingMode::AbsoluteY) => self.eor_absolutey(info),
+            (Instruction::EOR, AddressingMode::IndirectX) => self.eor_indirectx(info),
+            (Instruction::EOR, AddressingMode::IndirectY) => self.eor_indirecty(info),
             
             // INC
-            (Instruction::INC, AddressingMode::ZeroPage) => self.inc_zeropage(&info),
-            (Instruction::INC, AddressingMode::ZeroPageX) => self.inc_zeropagex(&info),
-            (Instruction::INC, AddressingMode::Absolute) => self.inc_absolute(&info),
-            (Instruction::INC, AddressingMode::AbsoluteX) => self.inc_absolutex(&info),
+            (Instruction::INC, AddressingMode::ZeroPage) => self.inc_zeropage(info),
+            (Instruction::INC, AddressingMode::ZeroPageX) => self.inc_zeropagex(info),
+            (Instruction::INC, AddressingMode::Absolute) => self.inc_absolute(info),
+            (Instruction::INC, AddressingMode::AbsoluteX) => self.inc_absolutex(info),
             
             // INX
-            (Instruction::INX, AddressingMode::Implicit) => self.inx_implicit(&info),
+            (Instruction::INX, AddressingMode::Implicit) => self.inx_implicit(info),
             
             // INY
-            (Instruction::INY, AddressingMode::Implicit) => self.iny_implicit(&info),
+            (Instruction::INY, AddressingMode::Implicit) => self.iny_implicit(info),
             
             // JMP
-            (Instruction::JMP, AddressingMode::Absolute) => self.jmp_absolute(),
-            (Instruction::JMP, AddressingMode::Indirect) => self.jmp_indirect(),
+            (Instruction::JMP, AddressingMode::Absolute) => self.jmp_absolute(info),
+            (Instruction::JMP, AddressingMode::Indirect) => self.jmp_indirect(info),
             
             // JSR
-            (Instruction::JSR, AddressingMode::Absolute) => self.jsr_absolute(),
+            (Instruction::JSR, AddressingMode::Absolute) => self.jsr_absolute(info),
             
             // LDA
-            (Instruction::LDA, AddressingMode::Immediate) => self.lda_immediate(),
-            (Instruction::LDA, AddressingMode::ZeroPage) => self.lda_zeropage(),
-            (Instruction::LDA, AddressingMode::ZeroPageX) => self.lda_zeropagex(),
-            (Instruction::LDA, AddressingMode::Absolute) => self.lda_absolute(),
-            (Instruction::LDA, AddressingMode::AbsoluteX) => self.lda_absolutex(),
-            (Instruction::LDA, AddressingMode::AbsoluteY) => self.lda_absolutey(),
-            (Instruction::LDA, AddressingMode::IndirectX) => self.lda_indirectx(),
-            (Instruction::LDA, AddressingMode::IndirectY) => self.lda_indirecty(),
+            (Instruction::LDA, AddressingMode::Immediate) => self.lda_immediate(info),
+            (Instruction::LDA, AddressingMode::ZeroPage) => self.lda_zeropage(info),
+            (Instruction::LDA, AddressingMode::ZeroPageX) => self.lda_zeropagex(info),
+            (Instruction::LDA, AddressingMode::Absolute) => self.lda_absolute(info),
+            (Instruction::LDA, AddressingMode::AbsoluteX) => self.lda_absolutex(info),
+            (Instruction::LDA, AddressingMode::AbsoluteY) => self.lda_absolutey(info),
+            (Instruction::LDA, AddressingMode::IndirectX) => self.lda_indirectx(info),
+            (Instruction::LDA, AddressingMode::IndirectY) => self.lda_indirecty(info),
             
             // LDX
-            (Instruction::LDX, AddressingMode::Immediate) => self.ldx_immediate(),
-            (Instruction::LDX, AddressingMode::ZeroPage) => self.ldx_zeropage(),
-            (Instruction::LDX, AddressingMode::ZeroPageY) => self.ldx_zeropagey(),
-            (Instruction::LDX, AddressingMode::Absolute) => self.ldx_absolute(),
-            (Instruction::LDX, AddressingMode::AbsoluteY) => self.ldx_absolutey(),
+            (Instruction::LDX, AddressingMode::Immediate) => self.ldx_immediate(info),
+            (Instruction::LDX, AddressingMode::ZeroPage) => self.ldx_zeropage(info),
+            (Instruction::LDX, AddressingMode::ZeroPageY) => self.ldx_zeropagey(info),
+            (Instruction::LDX, AddressingMode::Absolute) => self.ldx_absolute(info),
+            (Instruction::LDX, AddressingMode::AbsoluteY) => self.ldx_absolutey(info),
             
             // LDY
-            (Instruction::LDY, AddressingMode::Immediate) => self.ldy_immediate(),
-            (Instruction::LDY, AddressingMode::ZeroPage) => self.ldy_zeropage(),
-            (Instruction::LDY, AddressingMode::ZeroPageX) => self.ldy_zeropagex(),
-            (Instruction::LDY, AddressingMode::Absolute) => self.ldy_absolute(),
-            (Instruction::LDY, AddressingMode::AbsoluteX) => self.ldy_absolutex(),
+            (Instruction::LDY, AddressingMode::Immediate) => self.ldy_immediate(info),
+            (Instruction::LDY, AddressingMode::ZeroPage) => self.ldy_zeropage(info),
+            (Instruction::LDY, AddressingMode::ZeroPageX) => self.ldy_zeropagex(info),
+            (Instruction::LDY, AddressingMode::Absolute) => self.ldy_absolute(info),
+            (Instruction::LDY, AddressingMode::AbsoluteX) => self.ldy_absolutex(info),
             
             // LSR
-            (Instruction::LSR, AddressingMode::Accumulator) => self.lsr_accumulator(),
-            (Instruction::LSR, AddressingMode::ZeroPage) => self.lsr_zeropage(),
-            (Instruction::LSR, AddressingMode::ZeroPageX) => self.lsr_zeropagex(),
-            (Instruction::LSR, AddressingMode::Absolute) => self.lsr_absolute(),
-            (Instruction::LSR, AddressingMode::AbsoluteX) => self.lsr_absolutex(),
+            (Instruction::LSR, AddressingMode::Accumulator) => self.lsr_accumulator(info),
+            (Instruction::LSR, AddressingMode::ZeroPage) => self.lsr_zeropage(info),
+            (Instruction::LSR, AddressingMode::ZeroPageX) => self.lsr_zeropagex(info),
+            (Instruction::LSR, AddressingMode::Absolute) => self.lsr_absolute(info),
+            (Instruction::LSR, AddressingMode::AbsoluteX) => self.lsr_absolutex(info),
             
             // NOP
-            (Instruction::NOP, _) => self.nop_implicit(),
+            (Instruction::NOP, _) => self.nop_implicit(info),
             
             // ORA
-            (Instruction::ORA, AddressingMode::Immediate) => self.ora_immediate(),
-            (Instruction::ORA, AddressingMode::ZeroPage) => self.ora_zeropage(),
-            (Instruction::ORA, AddressingMode::ZeroPageX) => self.ora_zeropagex(),
-            (Instruction::ORA, AddressingMode::Absolute) => self.ora_absolute(),
-            (Instruction::ORA, AddressingMode::AbsoluteX) => self.ora_absolutex(),
-            (Instruction::ORA, AddressingMode::AbsoluteY) => self.ora_absolutey(),
-            (Instruction::ORA, AddressingMode::IndirectX) => self.ora_indirectx(),
-            (Instruction::ORA, AddressingMode::IndirectY) => self.ora_indirecty(),
+            (Instruction::ORA, AddressingMode::Immediate) => self.ora_immediate(info),
+            (Instruction::ORA, AddressingMode::ZeroPage) => self.ora_zeropage(info),
+            (Instruction::ORA, AddressingMode::ZeroPageX) => self.ora_zeropagex(info),
+            (Instruction::ORA, AddressingMode::Absolute) => self.ora_absolute(info),
+            (Instruction::ORA, AddressingMode::AbsoluteX) => self.ora_absolutex(info),
+            (Instruction::ORA, AddressingMode::AbsoluteY) => self.ora_absolutey(info),
+            (Instruction::ORA, AddressingMode::IndirectX) => self.ora_indirectx(info),
+            (Instruction::ORA, AddressingMode::IndirectY) => self.ora_indirecty(info),
             
             // PHA
-            (Instruction::PHA, AddressingMode::Implicit) => self.pha_implicit(),
+            (Instruction::PHA, AddressingMode::Implicit) => self.pha_implicit(info),
             
             // PHP
-            (Instruction::PHP, AddressingMode::Implicit) => self.php_implicit(),
+            (Instruction::PHP, AddressingMode::Implicit) => self.php_implicit(info),
             
             // PLA
-            (Instruction::PLA, AddressingMode::Implicit) => self.pla_implicit(),
+            (Instruction::PLA, AddressingMode::Implicit) => self.pla_implicit(info),
             
             // PLP
-            (Instruction::PLP, AddressingMode::Implicit) => self.plp_implicit(),
+            (Instruction::PLP, AddressingMode::Implicit) => self.plp_implicit(info),
             
             // ROL
-            (Instruction::ROL, AddressingMode::Accumulator) => self.rol_accumulator(),
-            (Instruction::ROL, AddressingMode::ZeroPage) => self.rol_zeropage(),
-            (Instruction::ROL, AddressingMode::ZeroPageX) => self.rol_zeropagex(),
-            (Instruction::ROL, AddressingMode::Absolute) => self.rol_absolute(),
-            (Instruction::ROL, AddressingMode::AbsoluteX) => self.rol_absolutex(),
+            (Instruction::ROL, AddressingMode::Accumulator) => self.rol_accumulator(info),
+            (Instruction::ROL, AddressingMode::ZeroPage) => self.rol_zeropage(info),
+            (Instruction::ROL, AddressingMode::ZeroPageX) => self.rol_zeropagex(info),
+            (Instruction::ROL, AddressingMode::Absolute) => self.rol_absolute(info),
+            (Instruction::ROL, AddressingMode::AbsoluteX) => self.rol_absolutex(info),
             
             // ROR
-            (Instruction::ROR, AddressingMode::Accumulator) => self.ror_accumulator(),
-            (Instruction::ROR, AddressingMode::ZeroPage) => self.ror_zeropage(),
-            (Instruction::ROR, AddressingMode::ZeroPageX) => self.ror_zeropagex(),
-            (Instruction::ROR, AddressingMode::Absolute) => self.ror_absolute(),
-            (Instruction::ROR, AddressingMode::AbsoluteX) => self.ror_absolutex(),
+            (Instruction::ROR, AddressingMode::Accumulator) => self.ror_accumulator(info),
+            (Instruction::ROR, AddressingMode::ZeroPage) => self.ror_zeropage(info),
+            (Instruction::ROR, AddressingMode::ZeroPageX) => self.ror_zeropagex(info),
+            (Instruction::ROR, AddressingMode::Absolute) => self.ror_absolute(info),
+            (Instruction::ROR, AddressingMode::AbsoluteX) => self.ror_absolutex(info),
             
             // RTI
-            (Instruction::RTI, AddressingMode::Implicit) => self.rti_implicit(),
+            (Instruction::RTI, AddressingMode::Implicit) => self.rti_implicit(info),
             
             // RTS
-            (Instruction::RTS, AddressingMode::Implicit) => self.rts_implicit(),
+            (Instruction::RTS, AddressingMode::Implicit) => self.rts_implicit(info),
             
             // SBC
-            (Instruction::SBC, AddressingMode::Immediate) => self.sbc_immediate(),
-            (Instruction::SBC, AddressingMode::ZeroPage) => self.sbc_zeropage(),
-            (Instruction::SBC, AddressingMode::ZeroPageX) => self.sbc_zeropagex(),
-            (Instruction::SBC, AddressingMode::Absolute) => self.sbc_absolute(),
-            (Instruction::SBC, AddressingMode::AbsoluteX) => self.sbc_absolutex(),
-            (Instruction::SBC, AddressingMode::AbsoluteY) => self.sbc_absolutey(),
-            (Instruction::SBC, AddressingMode::IndirectX) => self.sbc_indirectx(),
-            (Instruction::SBC, AddressingMode::IndirectY) => self.sbc_indirecty(),
+            (Instruction::SBC, AddressingMode::Immediate) => self.sbc_immediate(info),
+            (Instruction::SBC, AddressingMode::ZeroPage) => self.sbc_zeropage(info),
+            (Instruction::SBC, AddressingMode::ZeroPageX) => self.sbc_zeropagex(info),
+            (Instruction::SBC, AddressingMode::Absolute) => self.sbc_absolute(info),
+            (Instruction::SBC, AddressingMode::AbsoluteX) => self.sbc_absolutex(info),
+            (Instruction::SBC, AddressingMode::AbsoluteY) => self.sbc_absolutey(info),
+            (Instruction::SBC, AddressingMode::IndirectX) => self.sbc_indirectx(info),
+            (Instruction::SBC, AddressingMode::IndirectY) => self.sbc_indirecty(info),
             
             // SEC
-            (Instruction::SEC, AddressingMode::Implicit) => self.sec_implicit(),
+            (Instruction::SEC, AddressingMode::Implicit) => self.sec_implicit(info),
             
             // SED
-            (Instruction::SED, AddressingMode::Implicit) => self.sed_implicit(),
+            (Instruction::SED, AddressingMode::Implicit) => self.sed_implicit(info),
             
             // SEI
-            (Instruction::SEI, AddressingMode::Implicit) => self.sei_implicit(),
+            (Instruction::SEI, AddressingMode::Implicit) => self.sei_implicit(info),
             
             // STA
-            (Instruction::STA, AddressingMode::ZeroPage) => self.sta_zeropage(),
-            (Instruction::STA, AddressingMode::ZeroPageX) => self.sta_zeropagex(),
-            (Instruction::STA, AddressingMode::Absolute) => self.sta_absolute(),
-            (Instruction::STA, AddressingMode::AbsoluteX) => self.sta_absolutex(),
-            (Instruction::STA, AddressingMode::AbsoluteY) => self.sta_absolutey(),
-            (Instruction::STA, AddressingMode::IndirectX) => self.sta_indirectx(),
-            (Instruction::STA, AddressingMode::IndirectY) => self.sta_indirecty(),
+            (Instruction::STA, AddressingMode::ZeroPage) => self.sta_zeropage(info),
+            (Instruction::STA, AddressingMode::ZeroPageX) => self.sta_zeropagex(info),
+            (Instruction::STA, AddressingMode::Absolute) => self.sta_absolute(info),
+            (Instruction::STA, AddressingMode::AbsoluteX) => self.sta_absolutex(info),
+            (Instruction::STA, AddressingMode::AbsoluteY) => self.sta_absolutey(info),
+            (Instruction::STA, AddressingMode::IndirectX) => self.sta_indirectx(info),
+            (Instruction::STA, AddressingMode::IndirectY) => self.sta_indirecty(info),
             
             // STX
-            (Instruction::STX, AddressingMode::ZeroPage) => self.stx_zeropage(),
-            (Instruction::STX, AddressingMode::ZeroPageY) => self.stx_zeropagey(),
-            (Instruction::STX, AddressingMode::Absolute) => self.stx_absolute(),
+            (Instruction::STX, AddressingMode::ZeroPage) => self.stx_zeropage(info),
+            (Instruction::STX, AddressingMode::ZeroPageY) => self.stx_zeropagey(info),
+            (Instruction::STX, AddressingMode::Absolute) => self.stx_absolute(info),
             
             // STY
-            (Instruction::STY, AddressingMode::ZeroPage) => self.sty_zeropage(),
-            (Instruction::STY, AddressingMode::ZeroPageX) => self.sty_zeropagex(),
-            (Instruction::STY, AddressingMode::Absolute) => self.sty_absolute(),
+            (Instruction::STY, AddressingMode::ZeroPage) => self.sty_zeropage(info),
+            (Instruction::STY, AddressingMode::ZeroPageX) => self.sty_zeropagex(info),
+            (Instruction::STY, AddressingMode::Absolute) => self.sty_absolute(info),
             
             // TAX
-            (Instruction::TAX, AddressingMode::Implicit) => self.tax_implicit(),
+            (Instruction::TAX, AddressingMode::Implicit) => self.tax_implicit(info),
             
             // TAY
-            (Instruction::TAY, AddressingMode::Implicit) => self.tay_implicit(),
+            (Instruction::TAY, AddressingMode::Implicit) => self.tay_implicit(info),
             
             // TSX
-            (Instruction::TSX, AddressingMode::Implicit) => self.tsx_implicit(),
+            (Instruction::TSX, AddressingMode::Implicit) => self.tsx_implicit(info),
             
             // TXA
-            (Instruction::TXA, AddressingMode::Implicit) => self.txa_implicit(),
+            (Instruction::TXA, AddressingMode::Implicit) => self.txa_implicit(info),
             
             // TXS
-            (Instruction::TXS, AddressingMode::Implicit) => self.txs_implicit(),
+            (Instruction::TXS, AddressingMode::Implicit) => self.txs_implicit(info),
             
             // TYA
-            (Instruction::TYA, AddressingMode::Implicit) => self.tya_implicit(),
+            (Instruction::TYA, AddressingMode::Implicit) => self.tya_implicit(info),
         
             // All illegal Opcodes
-            _ => self.nop_implicit(),
+            _ => self.nop_implicit(info),
         }
     }
 
     // =========================================================================
-    // MÉTHODES VIDES (TODO)
+    //  Implement Opcode actions
     // =========================================================================
     
     // ADC
@@ -744,94 +757,992 @@ impl Cpu {
 
     fn adc_zeropage(&mut self, info: &OpcodeInfo) {
         let address = self.read_bus(self.pc);
+        self.pc += 1;
 
+        let value = self.read_bus(address as u16);
+        let carry = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let result = (self.a as u16) + (value as u16) + (carry as u16);
+
+        let carry_out = result > 0xFF;
+        let result = result as u8;
+
+        let overflow = ((!(self.a ^ value) & (self.a ^ result)) & 0x80) != 0;
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(result);
+
+        self.a = result;
+        self.cycle += info.cycles as u64;
     }
-    fn adc_zeropagex(&mut self) { todo!() }
-    fn adc_absolute(&mut self) { todo!() }
-    fn adc_absolutex(&mut self) { todo!() }
-    fn adc_absolutey(&mut self) { todo!() }
-    fn adc_indirectx(&mut self) { todo!() }
-    fn adc_indirecty(&mut self) { todo!() }
+
+    fn adc_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+
+        let value = self.read_bus(final_address);
+
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn adc_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        let value = self.read_bus(final_address);
+
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn adc_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address);
+
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn adc_absolutey(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address);
+
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn adc_indirectx(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let ptr_with_offset = ptr.wrapping_add(self.x);
+
+        let low = self.read_bus(ptr_with_offset as u16);
+
+        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+
+        let address = (high as u16) << 8 | (low as u16);
+
+        let value = self.read_bus(address);
+
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn adc_indirecty(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let low = self.read_bus(ptr as u16);
+        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address);
+
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
     
     // AND
-    fn and_immediate(&mut self) { todo!() }
-    fn and_zeropage(&mut self) { todo!() }
-    fn and_zeropagex(&mut self) { todo!() }
-    fn and_absolute(&mut self) { todo!() }
-    fn and_absolutex(&mut self) { todo!() }
-    fn and_absolutey(&mut self) { todo!() }
-    fn and_indirectx(&mut self) { todo!() }
-    fn and_indirecty(&mut self) { todo!() }
+    fn and_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+
+        self.a &= value;
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn and_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        self.a &= self.read_bus(address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn and_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        self.a &= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn and_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        self.a &= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn and_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+        self.a &= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn and_absolutey(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+        self.a &= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn and_indirectx(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let ptr_with_offset = ptr.wrapping_add(self.x);
+        let low = self.read_bus(ptr_with_offset as u16);
+        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        self.a &= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn and_indirecty(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let low = self.read_bus(ptr as u16);
+        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+        self.a &= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
     
     // ASL
-    fn asl_accumulator(&mut self) { todo!() }
-    fn asl_zeropage(&mut self) { todo!() }
-    fn asl_zeropagex(&mut self) { todo!() }
-    fn asl_absolute(&mut self) { todo!() }
-    fn asl_absolutex(&mut self) { todo!() }
+    fn asl_accumulator(&mut self, info: &OpcodeInfo) {
+        let carry_out = (self.a & 0x80) != 0;
+        self.a <<= 1;
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn asl_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let mut value = self.read_bus(address);
+        let carry_out = (value & 0x80) != 0;
+        value <<= 1;
+        self.write_bus(address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn asl_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        let mut value = self.read_bus(final_address);
+        let carry_out = (value & 0x80) != 0;
+        value <<= 1;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn asl_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        let mut value = self.read_bus(final_address);
+        let carry_out = (value & 0x80) != 0;
+        value <<= 1;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn asl_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+
+        let mut value = self.read_bus(final_address);
+        let carry_out = (value & 0x80) != 0;
+        value <<= 1;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
     
     // Branches
-    fn bcc_relative(&mut self) { todo!() }
-    fn bcs_relative(&mut self) { todo!() }
-    fn beq_relative(&mut self) { todo!() }
-    fn bmi_relative(&mut self) { todo!() }
-    fn bne_relative(&mut self) { todo!() }
-    fn bpl_relative(&mut self) { todo!() }
-    fn bvc_relative(&mut self) { todo!() }
-    fn bvs_relative(&mut self) { todo!() }
+    fn bcc_relative(&mut self, info: &OpcodeInfo) {
+        let offset = self.read_bus(self.pc) as i8;
+        self.pc += 1;
+
+        if !self.is_status_register_flag_active(StatusRegister::C) {
+            let old_pc = self.pc;
+            self.pc = self.pc.wrapping_add(offset as u16);
+            let page_crossed = (old_pc & 0xFF00) != (self.pc & 0xFF00);
+
+            self.cycle += info.cycles as u64 + 1 + if page_crossed { 1 } else { 0 };
+        } else {
+            self.cycle += info.cycles as u64;
+        }
+    }
+    fn bcs_relative(&mut self, info: &OpcodeInfo) {
+        let offset = self.read_bus(self.pc) as i8;
+        self.pc += 1;
+
+        if self.is_status_register_flag_active(StatusRegister::C) {
+            let old_pc = self.pc;
+            self.pc = self.pc.wrapping_add(offset as u16);
+            let page_crossed = (old_pc & 0xFF00) != (self.pc & 0xFF00);
+
+            self.cycle += info.cycles as u64 + 1 + if page_crossed { 1 } else { 0 };
+        } else {
+            self.cycle += info.cycles as u64;
+        }
+    }
+    fn beq_relative(&mut self, info: &OpcodeInfo) {
+        let offset = self.read_bus(self.pc) as i8;
+        self.pc += 1;
+
+        if self.is_status_register_flag_active(StatusRegister::Z) {
+            let old_pc = self.pc;
+            self.pc = self.pc.wrapping_add(offset as u16);
+            let page_crossed = (old_pc & 0xFF00) != (self.pc & 0xFF00);
+
+            self.cycle += info.cycles as u64 + 1 + if page_crossed { 1 } else { 0 };
+        } else {
+            self.cycle += info.cycles as u64;
+        }
+    }
+    fn bmi_relative(&mut self, info: &OpcodeInfo) {
+        let offset = self.read_bus(self.pc) as i8;
+        self.pc += 1;
+
+        if self.is_status_register_flag_active(StatusRegister::N) {
+            let old_pc = self.pc;
+            self.pc = self.pc.wrapping_add(offset as u16);
+            let page_crossed = (old_pc & 0xFF00) != (self.pc & 0xFF00);
+
+            self.cycle += info.cycles as u64 + 1 + if page_crossed { 1 } else { 0 };
+        } else {
+            self.cycle += info.cycles as u64;
+        }
+    }
+
+    fn bne_relative(&mut self, info: &OpcodeInfo) {
+        let offset = self.read_bus(self.pc) as i8;
+        self.pc += 1;
+
+        if !self.is_status_register_flag_active(StatusRegister::Z) {
+            let old_pc = self.pc;
+            self.pc = self.pc.wrapping_add(offset as u16);
+            let page_crossed = (old_pc & 0xFF00) != (self.pc & 0xFF00);
+
+            self.cycle += info.cycles as u64 + 1 + if page_crossed { 1 } else { 0 };
+        } else {
+            self.cycle += info.cycles as u64;
+        }
+    }
+
+    fn bpl_relative(&mut self, info: &OpcodeInfo) {
+        let offset = self.read_bus(self.pc) as i8;
+        self.pc += 1;
+
+        if !self.is_status_register_flag_active(StatusRegister::N) {
+            let old_pc = self.pc;
+            self.pc = self.pc.wrapping_add(offset as u16);
+            let page_crossed = (old_pc & 0xFF00) != (self.pc & 0xFF00);
+
+            self.cycle += info.cycles as u64 + 1 + if page_crossed { 1 } else { 0 };
+        } else {
+            self.cycle += info.cycles as u64;
+        }
+    }
+
+    fn bvc_relative(&mut self, info: &OpcodeInfo) {
+        let offset = self.read_bus(self.pc) as i8;
+        self.pc += 1;
+
+        if !self.is_status_register_flag_active(StatusRegister::V) {
+            let old_pc = self.pc;
+            self.pc = self.pc.wrapping_add(offset as u16);
+            let page_crossed = (old_pc & 0xFF00) != (self.pc & 0xFF00);
+
+            self.cycle += info.cycles as u64 + 1 + if page_crossed { 1 } else { 0 };
+        } else {
+            self.cycle += info.cycles as u64;
+        }
+    }
+
+    fn bvs_relative(&mut self, info: &OpcodeInfo) {
+        let offset = self.read_bus(self.pc) as i8;
+        self.pc += 1;
+
+        if self.is_status_register_flag_active(StatusRegister::V) {
+            let old_pc = self.pc;
+            self.pc = self.pc.wrapping_add(offset as u16);
+            let page_crossed = (old_pc & 0xFF00) != (self.pc & 0xFF00);
+
+            self.cycle += info.cycles as u64 + 1 + if page_crossed { 1 } else { 0 };
+        } else {
+            self.cycle += info.cycles as u64;
+        }
+    }
     
     // BIT
-    fn bit_zeropage(&mut self) { todo!() }
-    fn bit_absolute(&mut self) { todo!() }
+    fn bit_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let value = self.read_bus(address);
+        self.set_status_register_flag(StatusRegister::Z, (self.a & value) == 0);
+        self.set_status_register_flag(StatusRegister::V, (value & 0x40) != 0);
+        self.set_status_register_flag(StatusRegister::N, (value & 0x80) != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn bit_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        let value = self.read_bus(final_address);
+        self.set_status_register_flag(StatusRegister::Z, (self.a & value) == 0);
+        self.set_status_register_flag(StatusRegister::V, (value & 0x40) != 0);
+        self.set_status_register_flag(StatusRegister::N, (value & 0x80) != 0);
+        self.cycle += info.cycles as u64;
+    }
     
     // BRK
-    fn brk_implicit(&mut self) { todo!() }
+    fn brk_implicit(&mut self, info: &OpcodeInfo) {
+        self.pc += 1;
+        let high = (self.pc >> 8) as u8;
+        self.push(high);
+
+        let low = (self.pc & 0xFF) as u8;
+        self.push(low);
+
+        self.set_status_register_flag(StatusRegister::B, true);
+        self.set_status_register_flag(StatusRegister::U, true);
+        let sr_with_b = self.sr | 0x30;
+        self.push(sr_with_b);
+
+        self.set_status_register_flag(StatusRegister::I, true);
+        let irq_low = self.read_bus(0xFFFE);
+        let irq_high = self.read_bus(0xFFFF);
+        self.pc = (irq_high as u16) << 8 | (irq_low as u16);
+
+        self.cycle += info.cycles as u64;
+    }
     
     // CLx
-    fn clc_implicit(&mut self) { todo!() }
-    fn cld_implicit(&mut self) { todo!() }
-    fn cli_implicit(&mut self) { todo!() }
-    fn clv_implicit(&mut self) { todo!() }
+    fn clc_implicit(&mut self, info: &OpcodeInfo) {
+        self.set_status_register_flag(StatusRegister::C, false);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cld_implicit(&mut self, info: &OpcodeInfo) {
+        self.set_status_register_flag(StatusRegister::D, false);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cli_implicit(&mut self, info: &OpcodeInfo) {
+        self.set_status_register_flag(StatusRegister::I, false);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn clv_implicit(&mut self, info: &OpcodeInfo) {
+        self.set_status_register_flag(StatusRegister::V, false);
+        self.cycle += info.cycles as u64;
+    }
     
     // CMP
-    fn cmp_immediate(&mut self) { todo!() }
-    fn cmp_zeropage(&mut self) { todo!() }
-    fn cmp_zeropagex(&mut self) { todo!() }
-    fn cmp_absolute(&mut self) { todo!() }
-    fn cmp_absolutex(&mut self) { todo!() }
-    fn cmp_absolutey(&mut self) { todo!() }
-    fn cmp_indirectx(&mut self) { todo!() }
-    fn cmp_indirecty(&mut self) { todo!() }
+    fn cmp_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let result = self.a.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.a >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.a == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cmp_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let value = self.read_bus(address as u16);
+        let result = self.a.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.a >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.a == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cmp_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x);
+
+        let value = self.read_bus(final_address as u16);
+        let result = self.a.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.a >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.a == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cmp_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        let value = self.read_bus(final_address);
+        let result = self.a.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.a >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.a == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cmp_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address);
+        let result = self.a.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.a >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.a == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn cmp_absolutey(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address);
+        let result = self.a.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.a >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.a == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn cmp_indirectx(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let ptr_with_offset = ptr.wrapping_add(self.x);
+
+        let low = self.read_bus(ptr_with_offset as u16);
+        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        let value = self.read_bus(final_address);
+        let result = self.a.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.a >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.a == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b1000_0000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cmp_indirecty(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let low = self.read_bus(ptr as u16);
+        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address);
+        let result = self.a.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.a >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.a == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b1000_0000 != 0);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
     
     // CPX
-    fn cpx_immediate(&mut self) { todo!() }
-    fn cpx_zeropage(&mut self) { todo!() }
-    fn cpx_absolute(&mut self) { todo!() }
+    fn cpx_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let result = self.x.wrapping_sub(value);
+        self.set_status_register_flag(StatusRegister::C, self.x >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.x == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cpx_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let value = self.read_bus(address);
+        let result = self.x.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.x >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.x == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cpx_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        let value = self.read_bus(final_address);
+        let result = self.x.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.x >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.x == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
     
     // CPY
-    fn cpy_immediate(&mut self) { todo!() }
-    fn cpy_zeropage(&mut self) { todo!() }
-    fn cpy_absolute(&mut self) { todo!() }
+    fn cpy_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let result = self.y.wrapping_sub(value);
+        self.set_status_register_flag(StatusRegister::C, self.y >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.y == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cpy_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let value = self.read_bus(address);
+        let result = self.y.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.y >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.y == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn cpy_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        let value = self.read_bus(final_address);
+        let result = self.y.wrapping_sub(value);
+
+        self.set_status_register_flag(StatusRegister::C, self.y >= value);
+        self.set_status_register_flag(StatusRegister::Z, self.y == value);
+        self.set_status_register_flag(StatusRegister::N, result & 0b10000000 != 0);
+
+        self.cycle += info.cycles as u64;
+    }
     
     // DEC
-    fn dec_zeropage(&mut self) { todo!() }
-    fn dec_zeropagex(&mut self) { todo!() }
-    fn dec_absolute(&mut self) { todo!() }
-    fn dec_absolutex(&mut self) { todo!() }
+    fn dec_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let value = self.read_bus(address).wrapping_sub(1);
+        self.write_bus(address, value);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn dec_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        let value = self.read_bus(final_address).wrapping_sub(1);
+        self.write_bus(final_address, value);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn dec_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        let value = self.read_bus(final_address).wrapping_sub(1);
+        self.write_bus(final_address, value);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn dec_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+        let value = self.read_bus(final_address).wrapping_sub(1);
+        self.write_bus(final_address, value);
+
+        self.update_status_register_nz(value);
+        self.cycle += info.cycles as u64;
+    }
     
     // DEX, DEY
-    fn dex_implicit(&mut self) { todo!() }
-    fn dey_implicit(&mut self) { todo!() }
+    fn dex_implicit(&mut self, info: &OpcodeInfo) {
+        self.x = self.x.wrapping_sub(1);
+        self.update_status_register_nz(self.x);
+        self.cycle += info.cycles as u64;
+    }
+    fn dey_implicit(&mut self, info: &OpcodeInfo) {
+        self.y = self.y.wrapping_sub(1);
+        self.update_status_register_nz(self.y);
+        self.cycle += info.cycles as u64;
+    }
     
     // EOR
-    fn eor_immediate(&mut self) { todo!() }
-    fn eor_zeropage(&mut self) { todo!() }
-    fn eor_zeropagex(&mut self) { todo!() }
-    fn eor_absolute(&mut self) { todo!() }
-    fn eor_absolutex(&mut self) { todo!() }
-    fn eor_absolutey(&mut self) { todo!() }
-    fn eor_indirectx(&mut self) { todo!() }
-    fn eor_indirecty(&mut self) { todo!() }
+    fn eor_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+
+        self.a ^= value;
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn eor_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        self.a ^= self.read_bus(address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn eor_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        self.a ^= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn eor_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        self.a ^= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn eor_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+        self.a ^= self.read_bus(final_address);
+
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn eor_absolutey(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        self.a ^= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+    fn eor_indirectx(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let ptr_with_offset = ptr.wrapping_add(self.x);
+        let low = self.read_bus(ptr_with_offset as u16);
+        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        self.a ^= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn eor_indirecty(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let low = self.read_bus(ptr as u16);
+        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        self.a ^= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
     
     // INC
     fn inc_zeropage(&mut self, info: &OpcodeInfo) { 
@@ -883,16 +1794,16 @@ impl Cpu {
         let high = self.read_bus(self.pc);
         self.pc += 1;
 
-        let address = ((high as u16) << 8) | (low as u16);
-        let address = address.wrapping_add(self.x as u16);
+        let base_address = ((high as u16) << 8) | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
 
-        let value = self.read_bus(address);
+        let value = self.read_bus(final_address);
         let new_value = value.wrapping_add(1);
-        self.write_bus(address, new_value);
+        self.write_bus(final_address, new_value);
 
         self.update_status_register_nz(new_value);
         self.cycle += info.cycles as u64;
-    }    
+    }
 
     // INX, INY
     fn inx_implicit(&mut self, info: &OpcodeInfo) { 
@@ -908,11 +1819,58 @@ impl Cpu {
     }
     
     // JMP
-    fn jmp_absolute(&mut self) { todo!() }
-    fn jmp_indirect(&mut self) { todo!() }
+    fn jmp_absolute(&mut self, info: &OpcodeInfo) {
+        let low_addess = self.read_bus(self.pc);
+        self.pc +=1;
+
+        let high_address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let jump_address = (high_address as u16) << 8 | (low_addess as u16);
+        self.pc = jump_address;
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn jmp_indirect(&mut self, info: &OpcodeInfo) {
+        let low_ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high_ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let ptr_address = (high_ptr as u16)  << 8 | (low_ptr as u16);
+
+        let low_addess = self.read_bus(ptr_address);
+
+        let high_byte_addr = (ptr_address & 0xFF00) | ((ptr_address + 1) & 0x00FF);
+        let high_address = self.read_bus(high_byte_addr);
+        let jump_address = (high_address as u16) << 8 | (low_addess as u16);
+        self.pc = jump_address;
+
+        self.cycle += info.cycles as u64;
+    }
     
     // JSR
-    fn jsr_absolute(&mut self) { todo!() }
+    fn jsr_absolute(&mut self, info: &OpcodeInfo) {
+        let low_address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high_address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let jsr_address = (high_address as u16) << 8 | (low_address as u16);
+
+        let high: u8 = ((self.pc - 1) >> 8) as u8;
+        self.push(high);
+
+        let low: u8 = (self.pc - 1) as u8;
+        self.push(low);
+
+        self.pc = jsr_address;
+
+        self.cycle += info.cycles as u64;
+    }
     
     // LDA
     fn lda_immediate(&mut self, info: &OpcodeInfo) {
@@ -972,14 +1930,16 @@ impl Cpu {
         let high = self.read_bus(self.pc);
         self.pc += 1;
 
-        let address = (high as u16) << 8 | (low as u16);
-        let address = address.wrapping_add(self.x as u16);
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
 
-        let value = self.read_bus(address);
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address);
         self.a = value;
 
         self.update_status_register_nz(value);
-        self.cycle += info.cycles as u64;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
     fn lda_absolutey(&mut self, info: &OpcodeInfo) {
@@ -989,14 +1949,16 @@ impl Cpu {
         let high = self.read_bus(self.pc);
         self.pc += 1;
 
-        let address = (high as u16) << 8 | (low as u16);
-        let address = address.wrapping_add(self.y as u16);
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
 
-        let value = self.read_bus(address);
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address);
         self.a = value;
 
         self.update_status_register_nz(value);
-        self.cycle += info.cycles as u64;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
     fn lda_indirectx(&mut self, info: &OpcodeInfo) {
@@ -1028,110 +1990,946 @@ impl Cpu {
 
         let final_address = base_address.wrapping_add(self.y as u16);
 
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
         let value = self.read_bus(final_address);
         self.a = value;
 
         self.update_status_register_nz(value);
-        self.cycle += info.cycles as u64;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
     
     // LDX
-    fn ldx_immediate(&mut self) { todo!() }
-    fn ldx_zeropage(&mut self) { todo!() }
-    fn ldx_zeropagey(&mut self) { todo!() }
-    fn ldx_absolute(&mut self) { todo!() }
-    fn ldx_absolutey(&mut self) { todo!() }
+    fn ldx_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+
+        self.x = value;
+        self.update_status_register_nz(self.x);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ldx_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        self.x = self.read_bus(address);
+        self.update_status_register_nz(self.x);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ldx_zeropagey(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.y) as u16;
+
+        self.x = self.read_bus(final_address);
+        self.update_status_register_nz(self.x);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ldx_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        self.x = self.read_bus(final_address);
+        self.update_status_register_nz(self.x);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ldx_absolutey(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        self.x = self.read_bus(final_address);
+        self.update_status_register_nz(self.x);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
     
     // LDY
-    fn ldy_immediate(&mut self) { todo!() }
-    fn ldy_zeropage(&mut self) { todo!() }
-    fn ldy_zeropagex(&mut self) { todo!() }
-    fn ldy_absolute(&mut self) { todo!() }
-    fn ldy_absolutex(&mut self) { todo!() }
+    fn ldy_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+
+        self.y = value;
+        self.update_status_register_nz(self.y);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ldy_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        self.y = self.read_bus(address);
+        self.update_status_register_nz(self.y);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ldy_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        self.y = self.read_bus(final_address);
+        self.update_status_register_nz(self.y);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ldy_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        self.y = self.read_bus(final_address);
+        self.update_status_register_nz(self.y);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ldy_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        self.y = self.read_bus(final_address);
+        self.update_status_register_nz(self.y);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
     
     // LSR
-    fn lsr_accumulator(&mut self) { todo!() }
-    fn lsr_zeropage(&mut self) { todo!() }
-    fn lsr_zeropagex(&mut self) { todo!() }
-    fn lsr_absolute(&mut self) { todo!() }
-    fn lsr_absolutex(&mut self) { todo!() }
+    fn lsr_accumulator(&mut self, info: &OpcodeInfo) {
+        let carry_out = (self.a & 0x01) != 0;
+        self.a >>= 1;
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn lsr_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let mut value = self.read_bus(address);
+        let carry_out = (value & 0x01) != 0;
+        value >>= 1;
+        self.write_bus(address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn lsr_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        let mut value = self.read_bus(final_address);
+        let carry_out = (value & 0x01) != 0;
+        value >>= 1;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn lsr_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        let mut value = self.read_bus(final_address);
+        let carry_out = (value & 0x01) != 0;
+        value >>= 1;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn lsr_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+
+        let mut value = self.read_bus(final_address);
+        let carry_out = (value & 0x01) != 0;
+        value >>= 1;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+        self.cycle += info.cycles as u64;
+    }
     
     // NOP
-    fn nop_implicit(&mut self) { todo!() }
+    fn nop_implicit(&mut self, info: &OpcodeInfo) {
+        self.cycle += info.cycles as u64;
+    }
 
     // ORA
-    fn ora_immediate(&mut self) { todo!() }
-    fn ora_zeropage(&mut self) { todo!() }
-    fn ora_zeropagex(&mut self) { todo!() }
-    fn ora_absolute(&mut self) { todo!() }
-    fn ora_absolutex(&mut self) { todo!() }
-    fn ora_absolutey(&mut self) { todo!() }
-    fn ora_indirectx(&mut self) { todo!() }
-    fn ora_indirecty(&mut self) { todo!() }
+    fn ora_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+
+        self.a |= value;
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ora_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        self.a |= self.read_bus(address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ora_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        self.a |= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ora_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        self.a |= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ora_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        self.a |= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn ora_absolutey(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        self.a |= self.read_bus(final_address);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+    fn ora_indirectx(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let ptr_with_offset = ptr.wrapping_add(self.x);
+        let low = self.read_bus(ptr_with_offset as u16);
+        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        self.a |= self.read_bus(final_address);
+
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn ora_indirecty(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let low = self.read_bus(ptr as u16);
+        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        self.a |= self.read_bus(final_address);
+
+        self.update_status_register_nz(self.a);
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
     
     // PHA, PHP, PLA, PLP
-    fn pha_implicit(&mut self) { todo!() }
-    fn php_implicit(&mut self) { todo!() }
-    fn pla_implicit(&mut self) { todo!() }
-    fn plp_implicit(&mut self) { todo!() }
+    fn pha_implicit(&mut self, info: &OpcodeInfo) {
+        self.push(self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn php_implicit(&mut self, info: &OpcodeInfo) {
+        let sr_to_push = self.sr | 0x30;
+        self.push(sr_to_push);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn pla_implicit(&mut self, info: &OpcodeInfo) {
+        self.sp = self.sp.wrapping_add(1);
+        self.a = self.read_bus(0x0100 + self.sp as u16);
+        self.update_status_register_nz(self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn plp_implicit(&mut self, info: &OpcodeInfo) {
+        self.sp = self.sp.wrapping_add(1);
+        self.sr = self.read_bus(0x0100 + self.sp as u16);
+        
+        // For CPU 6502 the Flag B ignored (reset to 0)
+        self.set_status_register_flag(StatusRegister::B, false);
+        self.set_status_register_flag(StatusRegister::U, true);
+        
+        self.cycle += info.cycles as u64;
+    }
+
     
     // ROL
-    fn rol_accumulator(&mut self) { todo!() }
-    fn rol_zeropage(&mut self) { todo!() }
-    fn rol_zeropagex(&mut self) { todo!() }
-    fn rol_absolute(&mut self) { todo!() }
-    fn rol_absolutex(&mut self) { todo!() }
+    fn rol_accumulator(&mut self, info: &OpcodeInfo) {
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let carry_out = (self.a & 0x80) != 0;
+        self.a = (self.a << 1) | carry_in;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+
+        self.update_status_register_nz(self.a);
+        self.cycle += info.cycles as u64;
+    }
+    fn rol_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let mut value = self.read_bus(address);
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let carry_out = (value & 0x80) != 0;
+
+        value = (value << 1) | carry_in;
+        self.write_bus(address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn rol_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        let mut value = self.read_bus(final_address);
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let carry_out = (value & 0x80) != 0;
+
+        value = (value << 1) | carry_in;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn rol_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        let mut value = self.read_bus(final_address);
+
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let carry_out = (value & 0x80) != 0;
+
+        value = (value << 1) | carry_in;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn rol_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+        let mut value = self.read_bus(final_address);
+
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let carry_out = (value & 0x80) != 0;
+        value = (value << 1) | carry_in;
+
+        self.write_bus(final_address, value);
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
     
     // ROR
-    fn ror_accumulator(&mut self) { todo!() }
-    fn ror_zeropage(&mut self) { todo!() }
-    fn ror_zeropagex(&mut self) { todo!() }
-    fn ror_absolute(&mut self) { todo!() }
-    fn ror_absolutex(&mut self) { todo!() }
+    fn ror_accumulator(&mut self, info: &OpcodeInfo) {
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
+        let carry_out = (self.a & 0x01) != 0;
+
+        self.a = (self.a >> 1) | carry_in;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(self.a);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn ror_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let mut value = self.read_bus(address);
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
+        let carry_out = (value & 0x01) != 0;
+
+        value = (value >> 1) | carry_in;
+
+        self.write_bus(address, value);
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+    fn ror_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        let mut value = self.read_bus(final_address);
+
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
+        let carry_out = (value & 0x01) != 0;
+        value = (value >> 1) | carry_in;
+
+        self.write_bus(final_address, value);
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ror_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+        let mut value = self.read_bus(final_address);
+
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
+        let carry_out = (value & 0x01) != 0;
+
+        value = (value >> 1) | carry_in;
+
+        self.write_bus(final_address, value);
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
+
+    fn ror_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+        let mut value = self.read_bus(final_address);
+
+        let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
+        let carry_out = (value & 0x01) != 0;
+
+        value = (value >> 1) | carry_in;
+        self.write_bus(final_address, value);
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.update_status_register_nz(value);
+
+        self.cycle += info.cycles as u64;
+    }
     
     // RTI, RTS
-    fn rti_implicit(&mut self) { todo!() }
-    fn rts_implicit(&mut self) { todo!() }
+    fn rti_implicit(&mut self, info: &OpcodeInfo) {
+        self.sr = self.pull();
+        
+        // For CPU 6502 the Flag B ignored (reset to 0)
+        self.set_status_register_flag(StatusRegister::B, false);
+        self.set_status_register_flag(StatusRegister::U, true);
+
+        let low_pc = self.pull();
+        let high_pc = self.pull();
+        self.pc = (high_pc as u16) << 8 | (low_pc as u16);
+
+        self.cycle += info.cycles as u64;
+    }
+    
+    fn rts_implicit(&mut self, info: &OpcodeInfo) {
+        let low_pc = self.pull();
+        let high_pc = self.pull();
+
+        self.pc = ((high_pc as u16) << 8 | (low_pc as u16)) + 1;
+        self.cycle += info.cycles as u64;
+    }
     
     // SBC
-    fn sbc_immediate(&mut self) { todo!() }
-    fn sbc_zeropage(&mut self) { todo!() }
-    fn sbc_zeropagex(&mut self) { todo!() }
-    fn sbc_absolute(&mut self) { todo!() }
-    fn sbc_absolutex(&mut self) { todo!() }
-    fn sbc_absolutey(&mut self) { todo!() }
-    fn sbc_indirectx(&mut self) { todo!() }
-    fn sbc_indirecty(&mut self) { todo!() }
+    fn sbc_immediate(&mut self, info: &OpcodeInfo) {
+        let value = self.read_bus(self.pc);
+        self.pc += 1;
+        let value = value ^ 0xFF;
+
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sbc_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+
+        let value = self.read_bus(address) ^ 0xFF;
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sbc_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = address.wrapping_add(self.x) as u16;
+        let value = self.read_bus(final_address) ^ 0xFF;
+
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sbc_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        let value = self.read_bus(final_address) ^ 0xFF;
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sbc_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address) ^ 0xFF;
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+
+    fn sbc_absolutey(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address) ^ 0xFF;
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
+    fn sbc_indirectx(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let ptr_with_offset = ptr.wrapping_add(self.x);
+
+        let low = self.read_bus(ptr_with_offset as u16);
+        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let final_address = (high as u16) << 8 | (low as u16);
+
+        let value = self.read_bus(final_address) ^ 0xFF;
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+        let result_u8 = result_u16 as u8;
+
+        let carry_out = result_u16 > 0xFF;
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sbc_indirecty(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+
+        let low = self.read_bus(ptr as u16);
+        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+
+        let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
+
+        let value = self.read_bus(final_address) ^ 0xFF;
+        let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
+
+        let result_u16 = (self.a as u16) + (value as u16) + carry;
+        let result_u8 = result_u16 as u8;
+        let carry_out = result_u16 > 0xFF;
+        let overflow = ((!(self.a ^ value) & (self.a ^ result_u8)) & 0x80) != 0;
+
+        self.set_status_register_flag(StatusRegister::C, carry_out);
+        self.set_status_register_flag(StatusRegister::V, overflow);
+        self.update_status_register_nz(result_u8);
+
+        self.a = result_u8;
+        self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
+    }
     
     // SEC, SED, SEI
-    fn sec_implicit(&mut self) { todo!() }
-    fn sed_implicit(&mut self) { todo!() }
-    fn sei_implicit(&mut self) { todo!() }
+    fn sec_implicit(&mut self, info: &OpcodeInfo) {
+        self.set_status_register_flag(StatusRegister::C, true);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sed_implicit(&mut self, info: &OpcodeInfo) {
+        self.set_status_register_flag(StatusRegister::D, true);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sei_implicit(&mut self, info: &OpcodeInfo) {
+        self.set_status_register_flag(StatusRegister::I, true);
+        self.cycle += info.cycles as u64;
+    }
     
     // STA
-    fn sta_zeropage(&mut self) { todo!() }
-    fn sta_zeropagex(&mut self) { todo!() }
-    fn sta_absolute(&mut self) { todo!() }
-    fn sta_absolutex(&mut self) { todo!() }
-    fn sta_absolutey(&mut self) { todo!() }
-    fn sta_indirectx(&mut self) { todo!() }
-    fn sta_indirecty(&mut self) { todo!() }
+    fn sta_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+        self.write_bus(address, self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sta_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+        let final_address = address.wrapping_add(self.x) as u16;
+        self.write_bus(final_address, self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sta_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+        let final_address = (high as u16) << 8 | (low as u16);
+        self.write_bus(final_address, self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sta_absolutex(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.x as u16);
+        self.write_bus(final_address, self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sta_absolutey(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+        self.write_bus(final_address, self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sta_indirectx(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+        let ptr_with_offset = ptr.wrapping_add(self.x);
+        let low = self.read_bus(ptr_with_offset as u16);
+        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let final_address = (high as u16) << 8 | (low as u16);
+        self.write_bus(final_address, self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sta_indirecty(&mut self, info: &OpcodeInfo) {
+        let ptr = self.read_bus(self.pc);
+        self.pc += 1;
+        let low = self.read_bus(ptr as u16);
+        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let base_address = (high as u16) << 8 | (low as u16);
+        let final_address = base_address.wrapping_add(self.y as u16);
+        self.write_bus(final_address, self.a);
+        self.cycle += info.cycles as u64;
+    }
     
     // STX
-    fn stx_zeropage(&mut self) { todo!() }
-    fn stx_zeropagey(&mut self) { todo!() }
-    fn stx_absolute(&mut self) { todo!() }
+    fn stx_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+        self.write_bus(address, self.x);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn stx_zeropagey(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+        let final_address = address.wrapping_add(self.y) as u16;
+        self.write_bus(final_address, self.x);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn stx_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+        let final_address = (high as u16) << 8 | (low as u16);
+        self.write_bus(final_address, self.x);
+        self.cycle += info.cycles as u64;
+    }
     
     // STY
-    fn sty_zeropage(&mut self) { todo!() }
-    fn sty_zeropagex(&mut self) { todo!() }
-    fn sty_absolute(&mut self) { todo!() }
+    fn sty_zeropage(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc) as u16;
+        self.pc += 1;
+        self.write_bus(address, self.y);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sty_zeropagex(&mut self, info: &OpcodeInfo) {
+        let address = self.read_bus(self.pc);
+        self.pc += 1;
+        let final_address = address.wrapping_add(self.x) as u16;
+        self.write_bus(final_address, self.y);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn sty_absolute(&mut self, info: &OpcodeInfo) {
+        let low = self.read_bus(self.pc);
+        self.pc += 1;
+        let high = self.read_bus(self.pc);
+        self.pc += 1;
+        let final_address = (high as u16) << 8 | (low as u16);
+        self.write_bus(final_address, self.y);
+        self.cycle += info.cycles as u64;
+    }
     
     // Transferts
-    fn tax_implicit(&mut self) { todo!() }
-    fn tay_implicit(&mut self) { todo!() }
-    fn tsx_implicit(&mut self) { todo!() }
-    fn txa_implicit(&mut self) { todo!() }
-    fn txs_implicit(&mut self) { todo!() }
-    fn tya_implicit(&mut self) { todo!() }
+    fn tax_implicit(&mut self, info: &OpcodeInfo) {
+        self.x = self.a;
+        self.update_status_register_nz(self.x);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn tay_implicit(&mut self, info: &OpcodeInfo) {
+        self.y = self.a;
+        self.update_status_register_nz(self.y);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn tsx_implicit(&mut self, info: &OpcodeInfo) {
+        self.x = self.sp;
+        self.update_status_register_nz(self.x);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn txa_implicit(&mut self, info: &OpcodeInfo) {
+        self.a = self.x;
+        self.update_status_register_nz(self.a);
+        self.cycle += info.cycles as u64;
+    }
+
+    fn txs_implicit(&mut self, info: &OpcodeInfo) {
+        self.sp = self.x;
+        self.cycle += info.cycles as u64;
+    }
+
+    fn tya_implicit(&mut self, info: &OpcodeInfo) {
+        self.a = self.y;
+        self.update_status_register_nz(self.a);
+        self.cycle += info.cycles as u64;
+    }
 }
