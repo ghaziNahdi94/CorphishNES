@@ -2339,20 +2339,19 @@ impl Cpu {
     }
 
     fn pla_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
-        self.sp = self.sp.wrapping_add(1);
-        self.a = bus.read(0x0100 + self.sp as u16);
+        self.a = self.pull(bus);
         self.update_status_register_nz(self.a);
         self.cycle += info.cycles as u64;
     }
 
+
     fn plp_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
-        self.sp = self.sp.wrapping_add(1);
-        self.sr = bus.read(0x0100 + self.sp as u16);
-        
+        self.sr = self.pull(bus);
+
         // For CPU 6502 the Flag B ignored (reset to 0)
         self.set_status_register_flag(StatusRegister::B, false);
         self.set_status_register_flag(StatusRegister::U, true);
-        
+
         self.cycle += info.cycles as u64;
     }
 
