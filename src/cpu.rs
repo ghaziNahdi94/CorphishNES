@@ -2937,21 +2937,32 @@ impl Cpu {
 #[cfg(test)]
 mod test {
    use super::*;
-   use crate::bus::Bus;
+   use crate::{bus::Bus, cartridge::Cartridge};
  
    #[test]
    fn test_0xa9_lda_immediate_load_data() {
-        //je veux tester cette sequence [0xa9, 0x05, 0x00]
+        //instructions [0xa9, 0x05, 0x00]
+        let instruction = vec![0xa9, 0x05, 0x00];
+
         let bus = &mut Bus::new();
-        bus.rom = vec![0xa9, 0x05, 0x00];
+
+        let cartridge = Cartridge {
+            prg_rom: instruction.clone(),
+            chr_rom: vec![],
+            mapper: 0,
+            mirror_type: 0
+        };
+
+        bus.cartridge = Some(cartridge);
 
         let mut cpu: Cpu = Cpu::init();
 
         let mut index = 0;
-        while index < bus.rom.len() {
+        while index < instruction.len() {
             cpu.execute(bus);
             index += 1;
         }
+
         assert_eq!(cpu.a, 0x05);
         assert!(cpu.sr & 0b0000_0010 == 0b00);
         assert!(cpu.sr & 0b1000_0000 == 0);
@@ -2959,13 +2970,23 @@ mod test {
 
    #[test]
     fn test_0xa9_lda_zero_flag() {
+        let instruction = vec![0xa9, 0x00, 0x00];
+
         let bus = &mut Bus::new();
-        bus.rom = vec![0xa9, 0x00, 0x00];
+        let cartridge = Cartridge {
+            prg_rom: instruction.clone(),
+            chr_rom: vec![],
+            mapper: 0,
+            mirror_type: 0
+        };
+
+        bus.cartridge = Some(cartridge);
+
 
         let mut cpu: Cpu = Cpu::init();
 
         let mut index = 0;
-        while index < bus.rom.len() {
+        while index < instruction.len() {
             cpu.execute(bus);
             index += 1;
         }
@@ -2974,13 +2995,24 @@ mod test {
 
    #[test]
    fn test_0xaa_tax_move_a_to_x() {
+        let instruction: Vec<u8> = vec![0xaa, 0x00];
+
         let bus = &mut Bus::new();
-        bus.rom = vec![0xaa, 0x00]; 
+        let cartridge = Cartridge {
+            prg_rom: instruction.clone(),
+            chr_rom: vec![],
+            mapper: 0,
+            mirror_type: 0
+        };
+
+        bus.cartridge = Some(cartridge);
+
+
         let mut cpu: Cpu = Cpu::init();
         cpu.a = 10;
 
         let mut index = 0;
-        while index < bus.rom.len() {
+        while index < instruction.len() {
             cpu.execute(bus);
             index += 1;
         } 
@@ -2990,13 +3022,23 @@ mod test {
 
     #[test]
    fn test_5_ops_working_together() {
+        let instruction: Vec<u8> = vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00];
+
         let bus = &mut Bus::new();
-        bus.rom = vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00];
+        
+        let cartridge = Cartridge {
+            prg_rom: instruction.clone(),
+            chr_rom: vec![],
+            mapper: 0,
+            mirror_type: 0
+        };
+
+        bus.cartridge = Some(cartridge);
 
         let mut cpu: Cpu = Cpu::init();
         
         let mut index = 0;
-        while index < bus.rom.len() {
+        while index < instruction.len() {
             cpu.execute(bus);
             index += 1;
         }
@@ -3006,18 +3048,30 @@ mod test {
 
     #[test]
     fn test_inx_overflow() {
+        let instruction: Vec<u8> = vec![0xe8, 0xe8, 0x00];
+
         let bus = &mut Bus::new();
-        bus.rom = vec![0xe8, 0xe8, 0x00];
+
+        let cartridge = Cartridge {
+            prg_rom: instruction.clone(),
+            chr_rom: vec![],
+            mapper: 0,
+            mirror_type: 0
+        };
+
+        bus.cartridge = Some(cartridge);
+
 
         let mut cpu: Cpu = Cpu::init();
         cpu.x = 0xff;
 
         let mut index = 0;
-        while index < bus.rom.len() {
+        while index < instruction.len() {
             cpu.execute(bus);
             index += 1;
         }
 
         assert_eq!(cpu.x, 1);
     }
+
 }

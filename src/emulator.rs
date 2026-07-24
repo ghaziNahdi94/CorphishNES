@@ -13,7 +13,7 @@ impl Emulator {
             cpu: Cpu::init(),
             ppu: Ppu::init(),
             bus: Bus::new(),
-            cartridge: Cartridge { path: String::from("") }
+            cartridge: Cartridge::load("").unwrap()
         }
     }
 
