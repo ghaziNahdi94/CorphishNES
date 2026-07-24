@@ -8,6 +8,8 @@
 // ENUMS
 // ============================================================================
 
+use crate::bus::Bus;
+
 #[derive(Debug, Clone, Copy)]
 pub enum Instruction {
     ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL,
@@ -77,7 +79,6 @@ pub struct Cpu {
     pub sp: u8,
     pub pc: u16,
     pub sr: u8,
-    pub ram: [u8; 2048],
     pub cycle: u64,
 }
 
@@ -396,7 +397,6 @@ impl Cpu {
             pc: 0x8000,
             sr: 0x24,
             cycle: 0,
-            ram: [0; 2048],
         }
     }
 
@@ -421,103 +421,87 @@ impl Cpu {
         self.set_status_register_flag(StatusRegister::N, value & 0b10000000 != 0);
     }
 
-    // --- Bus ---
-    
-    pub fn read_bus(&self, address: u16) -> u8 {
-        match address {
-            0x0000..=0x1FFF => self.ram[(address & 0x07FF) as usize],
-            _ => 0,
-        }
-    }
-
-    pub fn write_bus(&mut self, address: u16, value: u8) {
-        match address {
-            0x0000..=0x1FFF => self.ram[(address & 0x07FF) as usize] = value,
-            _ => {}
-        }
-    }
-
     // --- Stack ---
 
-    fn push(&mut self, value: u8) {
+    fn push(&mut self, bus: &mut Bus, value: u8) {
         let address = 0x0100 + self.sp as u16;
-        self.write_bus(address, value);
+        bus.write(address, value);
         self.sp = self.sp.wrapping_sub(1);
     }
 
-    fn pull(&mut self) -> u8 {
+    fn pull(&mut self, bus: &mut Bus) -> u8 {
         self.sp = self.sp.wrapping_add(1);
         let address = 0x0100 + self.sp as u16;
 
-        self.read_bus(address)
+        bus.read(address)
     }
 
     // --- Execute ---
     
-    pub fn execute(&mut self) {
-        let opcode = self.read_bus(self.pc);
+    pub fn execute(&mut self, bus: &mut Bus) {
+        let opcode = bus.read(self.pc);
         self.pc += 1;
         
         let info = &OPCODE_TABLE[opcode as usize];
         
         match (info.instruction, info.mode) {
             // ADC
-            (Instruction::ADC, AddressingMode::Immediate) => self.adc_immediate(info),
-            (Instruction::ADC, AddressingMode::ZeroPage) => self.adc_zeropage(info),
-            (Instruction::ADC, AddressingMode::ZeroPageX) => self.adc_zeropagex(info),
-            (Instruction::ADC, AddressingMode::Absolute) => self.adc_absolute(info),
-            (Instruction::ADC, AddressingMode::AbsoluteX) => self.adc_absolutex(info),
-            (Instruction::ADC, AddressingMode::AbsoluteY) => self.adc_absolutey(info),
-            (Instruction::ADC, AddressingMode::IndirectX) => self.adc_indirectx(info),
-            (Instruction::ADC, AddressingMode::IndirectY) => self.adc_indirecty(info),
+            (Instruction::ADC, AddressingMode::Immediate) => self.adc_immediate(bus, info),
+            (Instruction::ADC, AddressingMode::ZeroPage) => self.adc_zeropage(bus, info),
+            (Instruction::ADC, AddressingMode::ZeroPageX) => self.adc_zeropagex(bus, info),
+            (Instruction::ADC, AddressingMode::Absolute) => self.adc_absolute(bus, info),
+            (Instruction::ADC, AddressingMode::AbsoluteX) => self.adc_absolutex(bus, info),
+            (Instruction::ADC, AddressingMode::AbsoluteY) => self.adc_absolutey(bus, info),
+            (Instruction::ADC, AddressingMode::IndirectX) => self.adc_indirectx(bus, info),
+            (Instruction::ADC, AddressingMode::IndirectY) => self.adc_indirecty(bus, info),
             
             // AND
-            (Instruction::AND, AddressingMode::Immediate) => self.and_immediate(info),
-            (Instruction::AND, AddressingMode::ZeroPage) => self.and_zeropage(info),
-            (Instruction::AND, AddressingMode::ZeroPageX) => self.and_zeropagex(info),
-            (Instruction::AND, AddressingMode::Absolute) => self.and_absolute(info),
-            (Instruction::AND, AddressingMode::AbsoluteX) => self.and_absolutex(info),
-            (Instruction::AND, AddressingMode::AbsoluteY) => self.and_absolutey(info),
-            (Instruction::AND, AddressingMode::IndirectX) => self.and_indirectx(info),
-            (Instruction::AND, AddressingMode::IndirectY) => self.and_indirecty(info),
+            (Instruction::AND, AddressingMode::Immediate) => self.and_immediate(bus, info),
+            (Instruction::AND, AddressingMode::ZeroPage) => self.and_zeropage(bus, info),
+            (Instruction::AND, AddressingMode::ZeroPageX) => self.and_zeropagex(bus, info),
+            (Instruction::AND, AddressingMode::Absolute) => self.and_absolute(bus, info),
+            (Instruction::AND, AddressingMode::AbsoluteX) => self.and_absolutex(bus, info),
+            (Instruction::AND, AddressingMode::AbsoluteY) => self.and_absolutey(bus, info),
+            (Instruction::AND, AddressingMode::IndirectX) => self.and_indirectx(bus, info),
+            (Instruction::AND, AddressingMode::IndirectY) => self.and_indirecty(bus, info),
             
             // ASL
             (Instruction::ASL, AddressingMode::Accumulator) => self.asl_accumulator(info),
-            (Instruction::ASL, AddressingMode::ZeroPage) => self.asl_zeropage(info),
-            (Instruction::ASL, AddressingMode::ZeroPageX) => self.asl_zeropagex(info),
-            (Instruction::ASL, AddressingMode::Absolute) => self.asl_absolute(info),
-            (Instruction::ASL, AddressingMode::AbsoluteX) => self.asl_absolutex(info),
+            (Instruction::ASL, AddressingMode::ZeroPage) => self.asl_zeropage(bus, info),
+            (Instruction::ASL, AddressingMode::ZeroPageX) => self.asl_zeropagex(bus, info),
+            (Instruction::ASL, AddressingMode::Absolute) => self.asl_absolute(bus, info),
+            (Instruction::ASL, AddressingMode::AbsoluteX) => self.asl_absolutex(bus, info),
             
             // BCC
-            (Instruction::BCC, AddressingMode::Relative) => self.bcc_relative(info),
+            (Instruction::BCC, AddressingMode::Relative) => self.bcc_relative(bus, info),
             
             // BCS
-            (Instruction::BCS, AddressingMode::Relative) => self.bcs_relative(info),
+            (Instruction::BCS, AddressingMode::Relative) => self.bcs_relative(bus, info),
             
             // BEQ
-            (Instruction::BEQ, AddressingMode::Relative) => self.beq_relative(info),
+            (Instruction::BEQ, AddressingMode::Relative) => self.beq_relative(bus, info),
             
             // BIT
-            (Instruction::BIT, AddressingMode::ZeroPage) => self.bit_zeropage(info),
-            (Instruction::BIT, AddressingMode::Absolute) => self.bit_absolute(info),
+            (Instruction::BIT, AddressingMode::ZeroPage) => self.bit_zeropage(bus, info),
+            (Instruction::BIT, AddressingMode::Absolute) => self.bit_absolute(bus, info),
             
             // BMI
-            (Instruction::BMI, AddressingMode::Relative) => self.bmi_relative(info),
+            (Instruction::BMI, AddressingMode::Relative) => self.bmi_relative(bus, info),
             
             // BNE
-            (Instruction::BNE, AddressingMode::Relative) => self.bne_relative(info),
+            (Instruction::BNE, AddressingMode::Relative) => self.bne_relative(bus, info),
             
             // BPL
-            (Instruction::BPL, AddressingMode::Relative) => self.bpl_relative(info),
+            (Instruction::BPL, AddressingMode::Relative) => self.bpl_relative(bus, info),
             
             // BRK
-            (Instruction::BRK, AddressingMode::Implicit) => self.brk_implicit(info),
+            (Instruction::BRK, AddressingMode::Implicit) => self.brk_implicit(bus, info),
             
             // BVC
-            (Instruction::BVC, AddressingMode::Relative) => self.bvc_relative(info),
+            (Instruction::BVC, AddressingMode::Relative) => self.bvc_relative(bus, info),
             
             // BVS
-            (Instruction::BVS, AddressingMode::Relative) => self.bvs_relative(info),
+            (Instruction::BVS, AddressingMode::Relative) => self.bvs_relative(bus, info),
             
             // CLC
             (Instruction::CLC, AddressingMode::Implicit) => self.clc_implicit(info),
@@ -532,30 +516,30 @@ impl Cpu {
             (Instruction::CLV, AddressingMode::Implicit) => self.clv_implicit(info),
             
             // CMP
-            (Instruction::CMP, AddressingMode::Immediate) => self.cmp_immediate(info),
-            (Instruction::CMP, AddressingMode::ZeroPage) => self.cmp_zeropage(info),
-            (Instruction::CMP, AddressingMode::ZeroPageX) => self.cmp_zeropagex(info),
-            (Instruction::CMP, AddressingMode::Absolute) => self.cmp_absolute(info),
-            (Instruction::CMP, AddressingMode::AbsoluteX) => self.cmp_absolutex(info),
-            (Instruction::CMP, AddressingMode::AbsoluteY) => self.cmp_absolutey(info),
-            (Instruction::CMP, AddressingMode::IndirectX) => self.cmp_indirectx(info),
-            (Instruction::CMP, AddressingMode::IndirectY) => self.cmp_indirecty(info),
+            (Instruction::CMP, AddressingMode::Immediate) => self.cmp_immediate(bus, info),
+            (Instruction::CMP, AddressingMode::ZeroPage) => self.cmp_zeropage(bus, info),
+            (Instruction::CMP, AddressingMode::ZeroPageX) => self.cmp_zeropagex(bus, info),
+            (Instruction::CMP, AddressingMode::Absolute) => self.cmp_absolute(bus, info),
+            (Instruction::CMP, AddressingMode::AbsoluteX) => self.cmp_absolutex(bus, info),
+            (Instruction::CMP, AddressingMode::AbsoluteY) => self.cmp_absolutey(bus, info),
+            (Instruction::CMP, AddressingMode::IndirectX) => self.cmp_indirectx(bus, info),
+            (Instruction::CMP, AddressingMode::IndirectY) => self.cmp_indirecty(bus, info),
             
             // CPX
-            (Instruction::CPX, AddressingMode::Immediate) => self.cpx_immediate(info),
-            (Instruction::CPX, AddressingMode::ZeroPage) => self.cpx_zeropage(info),
-            (Instruction::CPX, AddressingMode::Absolute) => self.cpx_absolute(info),
+            (Instruction::CPX, AddressingMode::Immediate) => self.cpx_immediate(bus, info),
+            (Instruction::CPX, AddressingMode::ZeroPage) => self.cpx_zeropage(bus, info),
+            (Instruction::CPX, AddressingMode::Absolute) => self.cpx_absolute(bus, info),
             
             // CPY
-            (Instruction::CPY, AddressingMode::Immediate) => self.cpy_immediate(info),
-            (Instruction::CPY, AddressingMode::ZeroPage) => self.cpy_zeropage(info),
-            (Instruction::CPY, AddressingMode::Absolute) => self.cpy_absolute(info),
+            (Instruction::CPY, AddressingMode::Immediate) => self.cpy_immediate(bus, info),
+            (Instruction::CPY, AddressingMode::ZeroPage) => self.cpy_zeropage(bus, info),
+            (Instruction::CPY, AddressingMode::Absolute) => self.cpy_absolute(bus, info),
             
             // DEC
-            (Instruction::DEC, AddressingMode::ZeroPage) => self.dec_zeropage(info),
-            (Instruction::DEC, AddressingMode::ZeroPageX) => self.dec_zeropagex(info),
-            (Instruction::DEC, AddressingMode::Absolute) => self.dec_absolute(info),
-            (Instruction::DEC, AddressingMode::AbsoluteX) => self.dec_absolutex(info),
+            (Instruction::DEC, AddressingMode::ZeroPage) => self.dec_zeropage(bus, info),
+            (Instruction::DEC, AddressingMode::ZeroPageX) => self.dec_zeropagex(bus, info),
+            (Instruction::DEC, AddressingMode::Absolute) => self.dec_absolute(bus, info),
+            (Instruction::DEC, AddressingMode::AbsoluteX) => self.dec_absolutex(bus, info),
             
             // DEX
             (Instruction::DEX, AddressingMode::Implicit) => self.dex_implicit(info),
@@ -564,20 +548,20 @@ impl Cpu {
             (Instruction::DEY, AddressingMode::Implicit) => self.dey_implicit(info),
             
             // EOR
-            (Instruction::EOR, AddressingMode::Immediate) => self.eor_immediate(info),
-            (Instruction::EOR, AddressingMode::ZeroPage) => self.eor_zeropage(info),
-            (Instruction::EOR, AddressingMode::ZeroPageX) => self.eor_zeropagex(info),
-            (Instruction::EOR, AddressingMode::Absolute) => self.eor_absolute(info),
-            (Instruction::EOR, AddressingMode::AbsoluteX) => self.eor_absolutex(info),
-            (Instruction::EOR, AddressingMode::AbsoluteY) => self.eor_absolutey(info),
-            (Instruction::EOR, AddressingMode::IndirectX) => self.eor_indirectx(info),
-            (Instruction::EOR, AddressingMode::IndirectY) => self.eor_indirecty(info),
+            (Instruction::EOR, AddressingMode::Immediate) => self.eor_immediate(bus, info),
+            (Instruction::EOR, AddressingMode::ZeroPage) => self.eor_zeropage(bus, info),
+            (Instruction::EOR, AddressingMode::ZeroPageX) => self.eor_zeropagex(bus, info),
+            (Instruction::EOR, AddressingMode::Absolute) => self.eor_absolute(bus, info),
+            (Instruction::EOR, AddressingMode::AbsoluteX) => self.eor_absolutex(bus, info),
+            (Instruction::EOR, AddressingMode::AbsoluteY) => self.eor_absolutey(bus, info),
+            (Instruction::EOR, AddressingMode::IndirectX) => self.eor_indirectx(bus, info),
+            (Instruction::EOR, AddressingMode::IndirectY) => self.eor_indirecty(bus, info),
             
             // INC
-            (Instruction::INC, AddressingMode::ZeroPage) => self.inc_zeropage(info),
-            (Instruction::INC, AddressingMode::ZeroPageX) => self.inc_zeropagex(info),
-            (Instruction::INC, AddressingMode::Absolute) => self.inc_absolute(info),
-            (Instruction::INC, AddressingMode::AbsoluteX) => self.inc_absolutex(info),
+            (Instruction::INC, AddressingMode::ZeroPage) => self.inc_zeropage(bus, info),
+            (Instruction::INC, AddressingMode::ZeroPageX) => self.inc_zeropagex(bus, info),
+            (Instruction::INC, AddressingMode::Absolute) => self.inc_absolute(bus, info),
+            (Instruction::INC, AddressingMode::AbsoluteX) => self.inc_absolutex(bus, info),
             
             // INX
             (Instruction::INX, AddressingMode::Implicit) => self.inx_implicit(info),
@@ -586,97 +570,97 @@ impl Cpu {
             (Instruction::INY, AddressingMode::Implicit) => self.iny_implicit(info),
             
             // JMP
-            (Instruction::JMP, AddressingMode::Absolute) => self.jmp_absolute(info),
-            (Instruction::JMP, AddressingMode::Indirect) => self.jmp_indirect(info),
+            (Instruction::JMP, AddressingMode::Absolute) => self.jmp_absolute(bus, info),
+            (Instruction::JMP, AddressingMode::Indirect) => self.jmp_indirect(bus, info),
             
             // JSR
-            (Instruction::JSR, AddressingMode::Absolute) => self.jsr_absolute(info),
+            (Instruction::JSR, AddressingMode::Absolute) => self.jsr_absolute(bus, info),
             
             // LDA
-            (Instruction::LDA, AddressingMode::Immediate) => self.lda_immediate(info),
-            (Instruction::LDA, AddressingMode::ZeroPage) => self.lda_zeropage(info),
-            (Instruction::LDA, AddressingMode::ZeroPageX) => self.lda_zeropagex(info),
-            (Instruction::LDA, AddressingMode::Absolute) => self.lda_absolute(info),
-            (Instruction::LDA, AddressingMode::AbsoluteX) => self.lda_absolutex(info),
-            (Instruction::LDA, AddressingMode::AbsoluteY) => self.lda_absolutey(info),
-            (Instruction::LDA, AddressingMode::IndirectX) => self.lda_indirectx(info),
-            (Instruction::LDA, AddressingMode::IndirectY) => self.lda_indirecty(info),
+            (Instruction::LDA, AddressingMode::Immediate) => self.lda_immediate(bus, info),
+            (Instruction::LDA, AddressingMode::ZeroPage) => self.lda_zeropage(bus, info),
+            (Instruction::LDA, AddressingMode::ZeroPageX) => self.lda_zeropagex(bus, info),
+            (Instruction::LDA, AddressingMode::Absolute) => self.lda_absolute(bus, info),
+            (Instruction::LDA, AddressingMode::AbsoluteX) => self.lda_absolutex(bus, info),
+            (Instruction::LDA, AddressingMode::AbsoluteY) => self.lda_absolutey(bus, info),
+            (Instruction::LDA, AddressingMode::IndirectX) => self.lda_indirectx(bus, info),
+            (Instruction::LDA, AddressingMode::IndirectY) => self.lda_indirecty(bus, info),
             
             // LDX
-            (Instruction::LDX, AddressingMode::Immediate) => self.ldx_immediate(info),
-            (Instruction::LDX, AddressingMode::ZeroPage) => self.ldx_zeropage(info),
-            (Instruction::LDX, AddressingMode::ZeroPageY) => self.ldx_zeropagey(info),
-            (Instruction::LDX, AddressingMode::Absolute) => self.ldx_absolute(info),
-            (Instruction::LDX, AddressingMode::AbsoluteY) => self.ldx_absolutey(info),
+            (Instruction::LDX, AddressingMode::Immediate) => self.ldx_immediate(bus, info),
+            (Instruction::LDX, AddressingMode::ZeroPage) => self.ldx_zeropage(bus, info),
+            (Instruction::LDX, AddressingMode::ZeroPageY) => self.ldx_zeropagey(bus, info),
+            (Instruction::LDX, AddressingMode::Absolute) => self.ldx_absolute(bus, info),
+            (Instruction::LDX, AddressingMode::AbsoluteY) => self.ldx_absolutey(bus, info),
             
             // LDY
-            (Instruction::LDY, AddressingMode::Immediate) => self.ldy_immediate(info),
-            (Instruction::LDY, AddressingMode::ZeroPage) => self.ldy_zeropage(info),
-            (Instruction::LDY, AddressingMode::ZeroPageX) => self.ldy_zeropagex(info),
-            (Instruction::LDY, AddressingMode::Absolute) => self.ldy_absolute(info),
-            (Instruction::LDY, AddressingMode::AbsoluteX) => self.ldy_absolutex(info),
+            (Instruction::LDY, AddressingMode::Immediate) => self.ldy_immediate(bus, info),
+            (Instruction::LDY, AddressingMode::ZeroPage) => self.ldy_zeropage(bus, info),
+            (Instruction::LDY, AddressingMode::ZeroPageX) => self.ldy_zeropagex(bus, info),
+            (Instruction::LDY, AddressingMode::Absolute) => self.ldy_absolute(bus, info),
+            (Instruction::LDY, AddressingMode::AbsoluteX) => self.ldy_absolutex(bus, info),
             
             // LSR
             (Instruction::LSR, AddressingMode::Accumulator) => self.lsr_accumulator(info),
-            (Instruction::LSR, AddressingMode::ZeroPage) => self.lsr_zeropage(info),
-            (Instruction::LSR, AddressingMode::ZeroPageX) => self.lsr_zeropagex(info),
-            (Instruction::LSR, AddressingMode::Absolute) => self.lsr_absolute(info),
-            (Instruction::LSR, AddressingMode::AbsoluteX) => self.lsr_absolutex(info),
+            (Instruction::LSR, AddressingMode::ZeroPage) => self.lsr_zeropage(bus, info),
+            (Instruction::LSR, AddressingMode::ZeroPageX) => self.lsr_zeropagex(bus, info),
+            (Instruction::LSR, AddressingMode::Absolute) => self.lsr_absolute(bus, info),
+            (Instruction::LSR, AddressingMode::AbsoluteX) => self.lsr_absolutex(bus, info),
             
             // NOP
             (Instruction::NOP, _) => self.nop_implicit(info),
             
             // ORA
-            (Instruction::ORA, AddressingMode::Immediate) => self.ora_immediate(info),
-            (Instruction::ORA, AddressingMode::ZeroPage) => self.ora_zeropage(info),
-            (Instruction::ORA, AddressingMode::ZeroPageX) => self.ora_zeropagex(info),
-            (Instruction::ORA, AddressingMode::Absolute) => self.ora_absolute(info),
-            (Instruction::ORA, AddressingMode::AbsoluteX) => self.ora_absolutex(info),
-            (Instruction::ORA, AddressingMode::AbsoluteY) => self.ora_absolutey(info),
-            (Instruction::ORA, AddressingMode::IndirectX) => self.ora_indirectx(info),
-            (Instruction::ORA, AddressingMode::IndirectY) => self.ora_indirecty(info),
+            (Instruction::ORA, AddressingMode::Immediate) => self.ora_immediate(bus, info),
+            (Instruction::ORA, AddressingMode::ZeroPage) => self.ora_zeropage(bus, info),
+            (Instruction::ORA, AddressingMode::ZeroPageX) => self.ora_zeropagex(bus, info),
+            (Instruction::ORA, AddressingMode::Absolute) => self.ora_absolute(bus, info),
+            (Instruction::ORA, AddressingMode::AbsoluteX) => self.ora_absolutex(bus, info),
+            (Instruction::ORA, AddressingMode::AbsoluteY) => self.ora_absolutey(bus, info),
+            (Instruction::ORA, AddressingMode::IndirectX) => self.ora_indirectx(bus, info),
+            (Instruction::ORA, AddressingMode::IndirectY) => self.ora_indirecty(bus, info),
             
             // PHA
-            (Instruction::PHA, AddressingMode::Implicit) => self.pha_implicit(info),
+            (Instruction::PHA, AddressingMode::Implicit) => self.pha_implicit(bus, info),
             
             // PHP
-            (Instruction::PHP, AddressingMode::Implicit) => self.php_implicit(info),
+            (Instruction::PHP, AddressingMode::Implicit) => self.php_implicit(bus, info),
             
             // PLA
-            (Instruction::PLA, AddressingMode::Implicit) => self.pla_implicit(info),
+            (Instruction::PLA, AddressingMode::Implicit) => self.pla_implicit(bus, info),
             
             // PLP
-            (Instruction::PLP, AddressingMode::Implicit) => self.plp_implicit(info),
+            (Instruction::PLP, AddressingMode::Implicit) => self.plp_implicit(bus, info),
             
             // ROL
             (Instruction::ROL, AddressingMode::Accumulator) => self.rol_accumulator(info),
-            (Instruction::ROL, AddressingMode::ZeroPage) => self.rol_zeropage(info),
-            (Instruction::ROL, AddressingMode::ZeroPageX) => self.rol_zeropagex(info),
-            (Instruction::ROL, AddressingMode::Absolute) => self.rol_absolute(info),
-            (Instruction::ROL, AddressingMode::AbsoluteX) => self.rol_absolutex(info),
+            (Instruction::ROL, AddressingMode::ZeroPage) => self.rol_zeropage(bus, info),
+            (Instruction::ROL, AddressingMode::ZeroPageX) => self.rol_zeropagex(bus, info),
+            (Instruction::ROL, AddressingMode::Absolute) => self.rol_absolute(bus, info),
+            (Instruction::ROL, AddressingMode::AbsoluteX) => self.rol_absolutex(bus, info),
             
             // ROR
             (Instruction::ROR, AddressingMode::Accumulator) => self.ror_accumulator(info),
-            (Instruction::ROR, AddressingMode::ZeroPage) => self.ror_zeropage(info),
-            (Instruction::ROR, AddressingMode::ZeroPageX) => self.ror_zeropagex(info),
-            (Instruction::ROR, AddressingMode::Absolute) => self.ror_absolute(info),
-            (Instruction::ROR, AddressingMode::AbsoluteX) => self.ror_absolutex(info),
+            (Instruction::ROR, AddressingMode::ZeroPage) => self.ror_zeropage(bus, info),
+            (Instruction::ROR, AddressingMode::ZeroPageX) => self.ror_zeropagex(bus, info),
+            (Instruction::ROR, AddressingMode::Absolute) => self.ror_absolute(bus, info),
+            (Instruction::ROR, AddressingMode::AbsoluteX) => self.ror_absolutex(bus, info),
             
             // RTI
-            (Instruction::RTI, AddressingMode::Implicit) => self.rti_implicit(info),
+            (Instruction::RTI, AddressingMode::Implicit) => self.rti_implicit(bus, info),
             
             // RTS
-            (Instruction::RTS, AddressingMode::Implicit) => self.rts_implicit(info),
+            (Instruction::RTS, AddressingMode::Implicit) => self.rts_implicit(bus, info),
             
             // SBC
-            (Instruction::SBC, AddressingMode::Immediate) => self.sbc_immediate(info),
-            (Instruction::SBC, AddressingMode::ZeroPage) => self.sbc_zeropage(info),
-            (Instruction::SBC, AddressingMode::ZeroPageX) => self.sbc_zeropagex(info),
-            (Instruction::SBC, AddressingMode::Absolute) => self.sbc_absolute(info),
-            (Instruction::SBC, AddressingMode::AbsoluteX) => self.sbc_absolutex(info),
-            (Instruction::SBC, AddressingMode::AbsoluteY) => self.sbc_absolutey(info),
-            (Instruction::SBC, AddressingMode::IndirectX) => self.sbc_indirectx(info),
-            (Instruction::SBC, AddressingMode::IndirectY) => self.sbc_indirecty(info),
+            (Instruction::SBC, AddressingMode::Immediate) => self.sbc_immediate(bus, info),
+            (Instruction::SBC, AddressingMode::ZeroPage) => self.sbc_zeropage(bus, info),
+            (Instruction::SBC, AddressingMode::ZeroPageX) => self.sbc_zeropagex(bus, info),
+            (Instruction::SBC, AddressingMode::Absolute) => self.sbc_absolute(bus, info),
+            (Instruction::SBC, AddressingMode::AbsoluteX) => self.sbc_absolutex(bus, info),
+            (Instruction::SBC, AddressingMode::AbsoluteY) => self.sbc_absolutey(bus, info),
+            (Instruction::SBC, AddressingMode::IndirectX) => self.sbc_indirectx(bus, info),
+            (Instruction::SBC, AddressingMode::IndirectY) => self.sbc_indirecty(bus, info),
             
             // SEC
             (Instruction::SEC, AddressingMode::Implicit) => self.sec_implicit(info),
@@ -688,23 +672,23 @@ impl Cpu {
             (Instruction::SEI, AddressingMode::Implicit) => self.sei_implicit(info),
             
             // STA
-            (Instruction::STA, AddressingMode::ZeroPage) => self.sta_zeropage(info),
-            (Instruction::STA, AddressingMode::ZeroPageX) => self.sta_zeropagex(info),
-            (Instruction::STA, AddressingMode::Absolute) => self.sta_absolute(info),
-            (Instruction::STA, AddressingMode::AbsoluteX) => self.sta_absolutex(info),
-            (Instruction::STA, AddressingMode::AbsoluteY) => self.sta_absolutey(info),
-            (Instruction::STA, AddressingMode::IndirectX) => self.sta_indirectx(info),
-            (Instruction::STA, AddressingMode::IndirectY) => self.sta_indirecty(info),
+            (Instruction::STA, AddressingMode::ZeroPage) => self.sta_zeropage(bus, info),
+            (Instruction::STA, AddressingMode::ZeroPageX) => self.sta_zeropagex(bus, info),
+            (Instruction::STA, AddressingMode::Absolute) => self.sta_absolute(bus, info),
+            (Instruction::STA, AddressingMode::AbsoluteX) => self.sta_absolutex(bus, info),
+            (Instruction::STA, AddressingMode::AbsoluteY) => self.sta_absolutey(bus, info),
+            (Instruction::STA, AddressingMode::IndirectX) => self.sta_indirectx(bus, info),
+            (Instruction::STA, AddressingMode::IndirectY) => self.sta_indirecty(bus, info),
             
             // STX
-            (Instruction::STX, AddressingMode::ZeroPage) => self.stx_zeropage(info),
-            (Instruction::STX, AddressingMode::ZeroPageY) => self.stx_zeropagey(info),
-            (Instruction::STX, AddressingMode::Absolute) => self.stx_absolute(info),
+            (Instruction::STX, AddressingMode::ZeroPage) => self.stx_zeropage(bus, info),
+            (Instruction::STX, AddressingMode::ZeroPageY) => self.stx_zeropagey(bus, info),
+            (Instruction::STX, AddressingMode::Absolute) => self.stx_absolute(bus, info),
             
             // STY
-            (Instruction::STY, AddressingMode::ZeroPage) => self.sty_zeropage(info),
-            (Instruction::STY, AddressingMode::ZeroPageX) => self.sty_zeropagex(info),
-            (Instruction::STY, AddressingMode::Absolute) => self.sty_absolute(info),
+            (Instruction::STY, AddressingMode::ZeroPage) => self.sty_zeropage(bus, info),
+            (Instruction::STY, AddressingMode::ZeroPageX) => self.sty_zeropagex(bus, info),
+            (Instruction::STY, AddressingMode::Absolute) => self.sty_absolute(bus, info),
             
             // TAX
             (Instruction::TAX, AddressingMode::Implicit) => self.tax_implicit(info),
@@ -734,8 +718,8 @@ impl Cpu {
     // =========================================================================
     
     // ADC
-    fn adc_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn adc_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
@@ -755,11 +739,11 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn adc_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn adc_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
-        let value = self.read_bus(address as u16);
+        let value = bus.read(address as u16);
         let carry = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
         let result = (self.a as u16) + (value as u16) + (carry as u16);
 
@@ -775,13 +759,13 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn adc_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn adc_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
 
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
@@ -800,16 +784,16 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn adc_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn adc_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
 
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
@@ -828,11 +812,11 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn adc_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn adc_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -840,7 +824,7 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
 
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
@@ -859,11 +843,11 @@ impl Cpu {
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn adc_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn adc_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -871,7 +855,7 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
 
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
@@ -890,19 +874,19 @@ impl Cpu {
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn adc_indirectx(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn adc_indirectx(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
         let ptr_with_offset = ptr.wrapping_add(self.x);
 
-        let low = self.read_bus(ptr_with_offset as u16);
+        let low = bus.read(ptr_with_offset as u16);
 
-        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let high = bus.read(ptr_with_offset.wrapping_add(1) as u16);
 
         let address = (high as u16) << 8 | (low as u16);
 
-        let value = self.read_bus(address);
+        let value = bus.read(address);
 
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
@@ -921,19 +905,19 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn adc_indirecty(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn adc_indirecty(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
-        let low = self.read_bus(ptr as u16);
-        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let low = bus.read(ptr as u16);
+        let high = bus.read(ptr.wrapping_add(1) as u16);
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
 
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
@@ -953,8 +937,8 @@ impl Cpu {
     }
     
     // AND
-    fn and_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn and_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         self.a &= value;
@@ -963,99 +947,100 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn and_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn and_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        self.a &= self.read_bus(address);
+        self.a &= bus.read(address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn and_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn and_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        self.a &= self.read_bus(final_address);
+        self.a &= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn and_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn and_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        self.a &= self.read_bus(final_address);
+        self.a &= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn and_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn and_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
-        self.a &= self.read_bus(final_address);
+        self.a &= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn and_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn and_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
-        self.a &= self.read_bus(final_address);
+        self.a &= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn and_indirectx(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn and_indirectx(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
         let ptr_with_offset = ptr.wrapping_add(self.x);
-        let low = self.read_bus(ptr_with_offset as u16);
-        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let low = bus.read(ptr_with_offset as u16);
+        let high = bus.read(ptr_with_offset.wrapping_add(1) as u16);
         let final_address = (high as u16) << 8 | (low as u16);
 
-        self.a &= self.read_bus(final_address);
+        self.a &= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
-    fn and_indirecty(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+
+    fn and_indirecty(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
-        let low = self.read_bus(ptr as u16);
-        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let low = bus.read(ptr as u16);
+        let high = bus.read(ptr.wrapping_add(1) as u16);
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
-        self.a &= self.read_bus(final_address);
+        self.a &= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
@@ -1071,14 +1056,14 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn asl_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn asl_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let mut value = self.read_bus(address);
+        let mut value = bus.read(address);
         let carry_out = (value & 0x80) != 0;
         value <<= 1;
-        self.write_bus(address, value);
+        bus.write(address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -1086,15 +1071,15 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn asl_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn asl_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
         let carry_out = (value & 0x80) != 0;
         value <<= 1;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -1102,18 +1087,18 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn asl_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn asl_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
         let carry_out = (value & 0x80) != 0;
         value <<= 1;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -1121,20 +1106,20 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn asl_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn asl_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
 
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
         let carry_out = (value & 0x80) != 0;
         value <<= 1;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -1143,8 +1128,8 @@ impl Cpu {
     }
     
     // Branches
-    fn bcc_relative(&mut self, info: &OpcodeInfo) {
-        let offset = self.read_bus(self.pc) as i8;
+    fn bcc_relative(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let offset = bus.read(self.pc) as i8;
         self.pc += 1;
 
         if !self.is_status_register_flag_active(StatusRegister::C) {
@@ -1157,8 +1142,9 @@ impl Cpu {
             self.cycle += info.cycles as u64;
         }
     }
-    fn bcs_relative(&mut self, info: &OpcodeInfo) {
-        let offset = self.read_bus(self.pc) as i8;
+
+    fn bcs_relative(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let offset = bus.read(self.pc) as i8;
         self.pc += 1;
 
         if self.is_status_register_flag_active(StatusRegister::C) {
@@ -1171,8 +1157,9 @@ impl Cpu {
             self.cycle += info.cycles as u64;
         }
     }
-    fn beq_relative(&mut self, info: &OpcodeInfo) {
-        let offset = self.read_bus(self.pc) as i8;
+
+    fn beq_relative(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let offset = bus.read(self.pc) as i8;
         self.pc += 1;
 
         if self.is_status_register_flag_active(StatusRegister::Z) {
@@ -1185,8 +1172,9 @@ impl Cpu {
             self.cycle += info.cycles as u64;
         }
     }
-    fn bmi_relative(&mut self, info: &OpcodeInfo) {
-        let offset = self.read_bus(self.pc) as i8;
+
+    fn bmi_relative(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let offset = bus.read(self.pc) as i8;
         self.pc += 1;
 
         if self.is_status_register_flag_active(StatusRegister::N) {
@@ -1200,8 +1188,8 @@ impl Cpu {
         }
     }
 
-    fn bne_relative(&mut self, info: &OpcodeInfo) {
-        let offset = self.read_bus(self.pc) as i8;
+    fn bne_relative(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let offset = bus.read(self.pc) as i8;
         self.pc += 1;
 
         if !self.is_status_register_flag_active(StatusRegister::Z) {
@@ -1215,8 +1203,8 @@ impl Cpu {
         }
     }
 
-    fn bpl_relative(&mut self, info: &OpcodeInfo) {
-        let offset = self.read_bus(self.pc) as i8;
+    fn bpl_relative(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let offset = bus.read(self.pc) as i8;
         self.pc += 1;
 
         if !self.is_status_register_flag_active(StatusRegister::N) {
@@ -1230,8 +1218,8 @@ impl Cpu {
         }
     }
 
-    fn bvc_relative(&mut self, info: &OpcodeInfo) {
-        let offset = self.read_bus(self.pc) as i8;
+    fn bvc_relative(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let offset = bus.read(self.pc) as i8;
         self.pc += 1;
 
         if !self.is_status_register_flag_active(StatusRegister::V) {
@@ -1245,8 +1233,8 @@ impl Cpu {
         }
     }
 
-    fn bvs_relative(&mut self, info: &OpcodeInfo) {
-        let offset = self.read_bus(self.pc) as i8;
+    fn bvs_relative(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let offset = bus.read(self.pc) as i8;
         self.pc += 1;
 
         if self.is_status_register_flag_active(StatusRegister::V) {
@@ -1261,11 +1249,11 @@ impl Cpu {
     }
     
     // BIT
-    fn bit_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn bit_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let value = self.read_bus(address);
+        let value = bus.read(address);
         self.set_status_register_flag(StatusRegister::Z, (self.a & value) == 0);
         self.set_status_register_flag(StatusRegister::V, (value & 0x40) != 0);
         self.set_status_register_flag(StatusRegister::N, (value & 0x80) != 0);
@@ -1273,15 +1261,15 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn bit_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn bit_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         self.set_status_register_flag(StatusRegister::Z, (self.a & value) == 0);
         self.set_status_register_flag(StatusRegister::V, (value & 0x40) != 0);
         self.set_status_register_flag(StatusRegister::N, (value & 0x80) != 0);
@@ -1289,22 +1277,22 @@ impl Cpu {
     }
     
     // BRK
-    fn brk_implicit(&mut self, info: &OpcodeInfo) {
+    fn brk_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
         self.pc += 1;
         let high = (self.pc >> 8) as u8;
-        self.push(high);
+        self.push(bus, high);
 
         let low = (self.pc & 0xFF) as u8;
-        self.push(low);
+        self.push(bus, low);
 
         self.set_status_register_flag(StatusRegister::B, true);
         self.set_status_register_flag(StatusRegister::U, true);
         let sr_with_b = self.sr | 0x30;
-        self.push(sr_with_b);
+        self.push(bus, sr_with_b);
 
         self.set_status_register_flag(StatusRegister::I, true);
-        let irq_low = self.read_bus(0xFFFE);
-        let irq_high = self.read_bus(0xFFFF);
+        let irq_low = bus.read(0xFFFE);
+        let irq_high = bus.read(0xFFFF);
         self.pc = (irq_high as u16) << 8 | (irq_low as u16);
 
         self.cycle += info.cycles as u64;
@@ -1332,8 +1320,8 @@ impl Cpu {
     }
     
     // CMP
-    fn cmp_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn cmp_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         let result = self.a.wrapping_sub(value);
@@ -1345,11 +1333,11 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cmp_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn cmp_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
-        let value = self.read_bus(address as u16);
+        let value = bus.read(address as u16);
         let result = self.a.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.a >= value);
@@ -1359,13 +1347,13 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cmp_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn cmp_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x);
 
-        let value = self.read_bus(final_address as u16);
+        let value = bus.read(final_address as u16);
         let result = self.a.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.a >= value);
@@ -1375,16 +1363,16 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cmp_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn cmp_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         let result = self.a.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.a >= value);
@@ -1394,11 +1382,11 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cmp_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn cmp_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -1406,7 +1394,7 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         let result = self.a.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.a >= value);
@@ -1416,11 +1404,11 @@ impl Cpu {
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn cmp_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn cmp_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -1428,7 +1416,7 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         let result = self.a.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.a >= value);
@@ -1438,18 +1426,18 @@ impl Cpu {
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn cmp_indirectx(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn cmp_indirectx(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
         let ptr_with_offset = ptr.wrapping_add(self.x);
 
-        let low = self.read_bus(ptr_with_offset as u16);
-        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let low = bus.read(ptr_with_offset as u16);
+        let high = bus.read(ptr_with_offset.wrapping_add(1) as u16);
 
         let final_address = (high as u16) << 8 | (low as u16);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         let result = self.a.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.a >= value);
@@ -1459,19 +1447,19 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cmp_indirecty(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn cmp_indirecty(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
-        let low = self.read_bus(ptr as u16);
-        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let low = bus.read(ptr as u16);
+        let high = bus.read(ptr.wrapping_add(1) as u16);
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         let result = self.a.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.a >= value);
@@ -1482,8 +1470,8 @@ impl Cpu {
     }
     
     // CPX
-    fn cpx_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn cpx_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         let result = self.x.wrapping_sub(value);
@@ -1494,11 +1482,11 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cpx_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn cpx_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let value = self.read_bus(address);
+        let value = bus.read(address);
         let result = self.x.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.x >= value);
@@ -1508,15 +1496,15 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cpx_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn cpx_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         let result = self.x.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.x >= value);
@@ -1527,8 +1515,8 @@ impl Cpu {
     }
     
     // CPY
-    fn cpy_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn cpy_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         let result = self.y.wrapping_sub(value);
@@ -1539,11 +1527,11 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cpy_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn cpy_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let value = self.read_bus(address);
+        let value = bus.read(address);
         let result = self.y.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.y >= value);
@@ -1553,15 +1541,15 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn cpy_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn cpy_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         let result = self.y.wrapping_sub(value);
 
         self.set_status_register_flag(StatusRegister::C, self.y >= value);
@@ -1572,53 +1560,55 @@ impl Cpu {
     }
     
     // DEC
-    fn dec_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn dec_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let value = self.read_bus(address).wrapping_sub(1);
-        self.write_bus(address, value);
+        let value = bus.read(address).wrapping_sub(1);
+        bus.write(address, value);
         self.update_status_register_nz(value);
 
         self.cycle += info.cycles as u64;
     }
-    fn dec_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+
+    fn dec_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        let value = self.read_bus(final_address).wrapping_sub(1);
-        self.write_bus(final_address, value);
+        let value = bus.read(final_address).wrapping_sub(1);
+        bus.write(final_address, value);
         self.update_status_register_nz(value);
 
         self.cycle += info.cycles as u64;
     }
-    fn dec_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+
+    fn dec_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        let value = self.read_bus(final_address).wrapping_sub(1);
-        self.write_bus(final_address, value);
+        let value = bus.read(final_address).wrapping_sub(1);
+        bus.write(final_address, value);
         self.update_status_register_nz(value);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn dec_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn dec_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
-        let value = self.read_bus(final_address).wrapping_sub(1);
-        self.write_bus(final_address, value);
+        let value = bus.read(final_address).wrapping_sub(1);
+        bus.write(final_address, value);
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64;
@@ -1630,6 +1620,7 @@ impl Cpu {
         self.update_status_register_nz(self.x);
         self.cycle += info.cycles as u64;
     }
+
     fn dey_implicit(&mut self, info: &OpcodeInfo) {
         self.y = self.y.wrapping_sub(1);
         self.update_status_register_nz(self.y);
@@ -1637,8 +1628,8 @@ impl Cpu {
     }
     
     // EOR
-    fn eor_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn eor_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         self.a ^= value;
@@ -1646,160 +1637,164 @@ impl Cpu {
 
         self.cycle += info.cycles as u64;
     }
-    fn eor_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+
+    fn eor_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        self.a ^= self.read_bus(address);
+        self.a ^= bus.read(address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
-    fn eor_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+
+    fn eor_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        self.a ^= self.read_bus(final_address);
+        self.a ^= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
-    fn eor_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+
+    fn eor_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        self.a ^= self.read_bus(final_address);
+        self.a ^= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn eor_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn eor_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
-        self.a ^= self.read_bus(final_address);
+        self.a ^= bus.read(final_address);
 
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn eor_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn eor_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        self.a ^= self.read_bus(final_address);
+        self.a ^= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
-    fn eor_indirectx(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+
+    fn eor_indirectx(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
         let ptr_with_offset = ptr.wrapping_add(self.x);
-        let low = self.read_bus(ptr_with_offset as u16);
-        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let low = bus.read(ptr_with_offset as u16);
+        let high = bus.read(ptr_with_offset.wrapping_add(1) as u16);
         let final_address = (high as u16) << 8 | (low as u16);
 
-        self.a ^= self.read_bus(final_address);
+        self.a ^= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn eor_indirecty(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn eor_indirecty(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
-        let low = self.read_bus(ptr as u16);
-        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let low = bus.read(ptr as u16);
+        let high = bus.read(ptr.wrapping_add(1) as u16);
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        self.a ^= self.read_bus(final_address);
+        self.a ^= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
     
     // INC
-    fn inc_zeropage(&mut self, info: &OpcodeInfo) { 
-        let address = self.read_bus(self.pc) as u16;
+    fn inc_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) { 
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let value = self.read_bus(address);
+        let value = bus.read(address);
         let value = value.wrapping_add(1);
-        self.write_bus(address, value);
+        bus.write(address, value);
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64;
      }
 
-    fn inc_zeropagex(&mut self, info: &OpcodeInfo) { 
-        let address = self.read_bus(self.pc);
+    fn inc_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) { 
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let address_with_offset = address.wrapping_add(self.x) as u16;
 
-        let value = self.read_bus(address_with_offset);
+        let value = bus.read(address_with_offset);
         let value = value.wrapping_add(1);
-        self.write_bus(address_with_offset, value);
+        bus.write(address_with_offset, value);
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64;
     }
 
-    fn inc_absolute(&mut self, info: &OpcodeInfo) { 
-        let low = self.read_bus(self.pc);
+    fn inc_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) { 
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let address = ((high as u16) << 8) | (low as u16);
-        let value = self.read_bus(address);
+        let value = bus.read(address);
         let value = value.wrapping_add(1);
-        self.write_bus(address, value);
+        bus.write(address, value);
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64;
     }
 
-    fn inc_absolutex(&mut self, info: &OpcodeInfo) { 
-        let low = self.read_bus(self.pc);
+    fn inc_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) { 
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = ((high as u16) << 8) | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         let new_value = value.wrapping_add(1);
-        self.write_bus(final_address, new_value);
+        bus.write(final_address, new_value);
 
         self.update_status_register_nz(new_value);
         self.cycle += info.cycles as u64;
@@ -1819,11 +1814,11 @@ impl Cpu {
     }
     
     // JMP
-    fn jmp_absolute(&mut self, info: &OpcodeInfo) {
-        let low_addess = self.read_bus(self.pc);
+    fn jmp_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low_addess = bus.read(self.pc);
         self.pc +=1;
 
-        let high_address = self.read_bus(self.pc);
+        let high_address = bus.read(self.pc);
         self.pc += 1;
 
         let jump_address = (high_address as u16) << 8 | (low_addess as u16);
@@ -1832,19 +1827,19 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn jmp_indirect(&mut self, info: &OpcodeInfo) {
-        let low_ptr = self.read_bus(self.pc);
+    fn jmp_indirect(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low_ptr = bus.read(self.pc);
         self.pc += 1;
 
-        let high_ptr = self.read_bus(self.pc);
+        let high_ptr = bus.read(self.pc);
         self.pc += 1;
 
         let ptr_address = (high_ptr as u16)  << 8 | (low_ptr as u16);
 
-        let low_addess = self.read_bus(ptr_address);
+        let low_addess = bus.read(ptr_address);
 
         let high_byte_addr = (ptr_address & 0xFF00) | ((ptr_address + 1) & 0x00FF);
-        let high_address = self.read_bus(high_byte_addr);
+        let high_address = bus.read(high_byte_addr);
         let jump_address = (high_address as u16) << 8 | (low_addess as u16);
         self.pc = jump_address;
 
@@ -1852,20 +1847,20 @@ impl Cpu {
     }
     
     // JSR
-    fn jsr_absolute(&mut self, info: &OpcodeInfo) {
-        let low_address = self.read_bus(self.pc);
+    fn jsr_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low_address = bus.read(self.pc);
         self.pc += 1;
 
-        let high_address = self.read_bus(self.pc);
+        let high_address = bus.read(self.pc);
         self.pc += 1;
 
         let jsr_address = (high_address as u16) << 8 | (low_address as u16);
 
         let high: u8 = ((self.pc - 1) >> 8) as u8;
-        self.push(high);
+        self.push(bus, high);
 
         let low: u8 = (self.pc - 1) as u8;
-        self.push(low);
+        self.push(bus, low);
 
         self.pc = jsr_address;
 
@@ -1873,8 +1868,8 @@ impl Cpu {
     }
     
     // LDA
-    fn lda_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn lda_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
         
         self.a = value;
@@ -1883,51 +1878,51 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn lda_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn lda_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let value = self.read_bus(address);
+        let value = bus.read(address);
         self.a = value;
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64;
     }
 
-    fn lda_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn lda_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let address_with_offset = address.wrapping_add(self.x) as u16;
 
-        let value = self.read_bus(address_with_offset);
+        let value = bus.read(address_with_offset);
         self.a = value;
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64;
     }
 
-    fn lda_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn lda_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let address = (high as u16) << 8 | (low as u16);
 
-        let value = self.read_bus(address);
+        let value = bus.read(address);
         self.a = value;
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64;
     }
 
-    fn lda_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn lda_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -1935,18 +1930,18 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         self.a = value;
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn lda_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn lda_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -1954,37 +1949,37 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         self.a = value;
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn lda_indirectx(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn lda_indirectx(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
         let ptr_final = ptr.wrapping_add(self.x);
 
-        let addr_low = self.read_bus(ptr_final as u16);
-        let addr_high = self.read_bus(ptr_final.wrapping_add(1) as u16);
+        let addr_low = bus.read(ptr_final as u16);
+        let addr_high = bus.read(ptr_final.wrapping_add(1) as u16);
 
         let address = (addr_high as u16) << 8 | (addr_low as u16);
 
-        let value = self.read_bus(address);
+        let value = bus.read(address);
         self.a = value;
 
         self.update_status_register_nz(value);
         self.cycle += info.cycles as u64;
     }
 
-    fn lda_indirecty(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn lda_indirecty(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
-        let addr_low = self.read_bus(ptr as u16);
-        let addr_high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let addr_low = bus.read(ptr as u16);
+        let addr_high = bus.read(ptr.wrapping_add(1) as u16);
 
         let base_address = (addr_high as u16) << 8 | (addr_low as u16);
 
@@ -1992,7 +1987,7 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address);
+        let value = bus.read(final_address);
         self.a = value;
 
         self.update_status_register_nz(value);
@@ -2000,8 +1995,8 @@ impl Cpu {
     }
     
     // LDX
-    fn ldx_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn ldx_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         self.x = value;
@@ -2010,48 +2005,48 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn ldx_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn ldx_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        self.x = self.read_bus(address);
+        self.x = bus.read(address);
         self.update_status_register_nz(self.x);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ldx_zeropagey(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn ldx_zeropagey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.y) as u16;
 
-        self.x = self.read_bus(final_address);
+        self.x = bus.read(final_address);
         self.update_status_register_nz(self.x);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ldx_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ldx_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
 
-        self.x = self.read_bus(final_address);
+        self.x = bus.read(final_address);
         self.update_status_register_nz(self.x);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ldx_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ldx_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -2059,15 +2054,15 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        self.x = self.read_bus(final_address);
+        self.x = bus.read(final_address);
         self.update_status_register_nz(self.x);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
     
     // LDY
-    fn ldy_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn ldy_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         self.y = value;
@@ -2076,46 +2071,46 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn ldy_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn ldy_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        self.y = self.read_bus(address);
+        self.y = bus.read(address);
         self.update_status_register_nz(self.y);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ldy_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn ldy_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        self.y = self.read_bus(final_address);
+        self.y = bus.read(final_address);
         self.update_status_register_nz(self.y);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ldy_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ldy_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        self.y = self.read_bus(final_address);
+        self.y = bus.read(final_address);
         self.update_status_register_nz(self.y);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ldy_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ldy_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -2123,7 +2118,7 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        self.y = self.read_bus(final_address);
+        self.y = bus.read(final_address);
         self.update_status_register_nz(self.y);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
@@ -2139,14 +2134,14 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn lsr_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn lsr_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let mut value = self.read_bus(address);
+        let mut value = bus.read(address);
         let carry_out = (value & 0x01) != 0;
         value >>= 1;
-        self.write_bus(address, value);
+        bus.write(address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -2154,15 +2149,15 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn lsr_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn lsr_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
         let carry_out = (value & 0x01) != 0;
         value >>= 1;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -2170,18 +2165,18 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn lsr_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn lsr_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
         let carry_out = (value & 0x01) != 0;
         value >>= 1;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -2189,20 +2184,20 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn lsr_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn lsr_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
 
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
         let carry_out = (value & 0x01) != 0;
         value >>= 1;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -2215,8 +2210,8 @@ impl Cpu {
     }
 
     // ORA
-    fn ora_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn ora_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
 
         self.a |= value;
@@ -2225,47 +2220,47 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn ora_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn ora_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        self.a |= self.read_bus(address);
+        self.a |= bus.read(address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ora_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn ora_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        self.a |= self.read_bus(final_address);
+        self.a |= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ora_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ora_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
 
-        self.a |= self.read_bus(final_address);
+        self.a |= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ora_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ora_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -2273,17 +2268,17 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        self.a |= self.read_bus(final_address);
+        self.a |= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn ora_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ora_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -2291,66 +2286,68 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        self.a |= self.read_bus(final_address);
+        self.a |= bus.read(final_address);
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
-    fn ora_indirectx(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+
+    fn ora_indirectx(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
         let ptr_with_offset = ptr.wrapping_add(self.x);
-        let low = self.read_bus(ptr_with_offset as u16);
-        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let low = bus.read(ptr_with_offset as u16);
+        let high = bus.read(ptr_with_offset.wrapping_add(1) as u16);
 
         let final_address = (high as u16) << 8 | (low as u16);
-        self.a |= self.read_bus(final_address);
+        self.a |= bus.read(final_address);
 
         self.update_status_register_nz(self.a);
 
         self.cycle += info.cycles as u64;
     }
-    fn ora_indirecty(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+
+    fn ora_indirecty(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
-        let low = self.read_bus(ptr as u16);
-        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let low = bus.read(ptr as u16);
+        let high = bus.read(ptr.wrapping_add(1) as u16);
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        self.a |= self.read_bus(final_address);
+        self.a |= bus.read(final_address);
 
         self.update_status_register_nz(self.a);
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
     
     // PHA, PHP, PLA, PLP
-    fn pha_implicit(&mut self, info: &OpcodeInfo) {
-        self.push(self.a);
+    fn pha_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        self.push(bus, self.a);
         self.cycle += info.cycles as u64;
     }
 
-    fn php_implicit(&mut self, info: &OpcodeInfo) {
+    fn php_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
         let sr_to_push = self.sr | 0x30;
-        self.push(sr_to_push);
+        self.push(bus, sr_to_push);
         self.cycle += info.cycles as u64;
     }
 
-    fn pla_implicit(&mut self, info: &OpcodeInfo) {
+    fn pla_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
         self.sp = self.sp.wrapping_add(1);
-        self.a = self.read_bus(0x0100 + self.sp as u16);
+        self.a = bus.read(0x0100 + self.sp as u16);
         self.update_status_register_nz(self.a);
         self.cycle += info.cycles as u64;
     }
 
-    fn plp_implicit(&mut self, info: &OpcodeInfo) {
+    fn plp_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
         self.sp = self.sp.wrapping_add(1);
-        self.sr = self.read_bus(0x0100 + self.sp as u16);
+        self.sr = bus.read(0x0100 + self.sp as u16);
         
         // For CPU 6502 the Flag B ignored (reset to 0)
         self.set_status_register_flag(StatusRegister::B, false);
@@ -2359,7 +2356,6 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    
     // ROL
     fn rol_accumulator(&mut self, info: &OpcodeInfo) {
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
@@ -2371,16 +2367,17 @@ impl Cpu {
         self.update_status_register_nz(self.a);
         self.cycle += info.cycles as u64;
     }
-    fn rol_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+
+    fn rol_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let mut value = self.read_bus(address);
+        let mut value = bus.read(address);
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
         let carry_out = (value & 0x80) != 0;
 
         value = (value << 1) | carry_in;
-        self.write_bus(address, value);
+        bus.write(address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -2388,38 +2385,39 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn rol_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn rol_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
         let carry_out = (value & 0x80) != 0;
 
         value = (value << 1) | carry_in;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
 
         self.cycle += info.cycles as u64;
     }
-    fn rol_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+
+    fn rol_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
 
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
         let carry_out = (value & 0x80) != 0;
 
         value = (value << 1) | carry_in;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -2427,22 +2425,22 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn rol_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn rol_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
 
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
         let carry_out = (value & 0x80) != 0;
         value = (value << 1) | carry_in;
 
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
 
@@ -2461,78 +2459,80 @@ impl Cpu {
 
         self.cycle += info.cycles as u64;
     }
-    fn ror_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+
+    fn ror_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let mut value = self.read_bus(address);
+        let mut value = bus.read(address);
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
         let carry_out = (value & 0x01) != 0;
 
         value = (value >> 1) | carry_in;
 
-        self.write_bus(address, value);
+        bus.write(address, value);
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
 
         self.cycle += info.cycles as u64;
     }
-    fn ror_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+
+    fn ror_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
 
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
         let carry_out = (value & 0x01) != 0;
         value = (value >> 1) | carry_in;
 
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ror_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ror_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
 
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
         let carry_out = (value & 0x01) != 0;
 
         value = (value >> 1) | carry_in;
 
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
 
         self.cycle += info.cycles as u64;
     }
 
-    fn ror_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn ror_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
-        let mut value = self.read_bus(final_address);
+        let mut value = bus.read(final_address);
 
         let carry_in = if self.is_status_register_flag_active(StatusRegister::C) { 0x80 } else { 0 };
         let carry_out = (value & 0x01) != 0;
 
         value = (value >> 1) | carry_in;
-        self.write_bus(final_address, value);
+        bus.write(final_address, value);
 
         self.set_status_register_flag(StatusRegister::C, carry_out);
         self.update_status_register_nz(value);
@@ -2541,31 +2541,31 @@ impl Cpu {
     }
     
     // RTI, RTS
-    fn rti_implicit(&mut self, info: &OpcodeInfo) {
-        self.sr = self.pull();
+    fn rti_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        self.sr = self.pull(bus);
         
         // For CPU 6502 the Flag B ignored (reset to 0)
         self.set_status_register_flag(StatusRegister::B, false);
         self.set_status_register_flag(StatusRegister::U, true);
 
-        let low_pc = self.pull();
-        let high_pc = self.pull();
+        let low_pc = self.pull(bus);
+        let high_pc = self.pull(bus);
         self.pc = (high_pc as u16) << 8 | (low_pc as u16);
 
         self.cycle += info.cycles as u64;
     }
     
-    fn rts_implicit(&mut self, info: &OpcodeInfo) {
-        let low_pc = self.pull();
-        let high_pc = self.pull();
+    fn rts_implicit(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low_pc = self.pull(bus);
+        let high_pc = self.pull(bus);
 
         self.pc = ((high_pc as u16) << 8 | (low_pc as u16)) + 1;
         self.cycle += info.cycles as u64;
     }
     
     // SBC
-    fn sbc_immediate(&mut self, info: &OpcodeInfo) {
-        let value = self.read_bus(self.pc);
+    fn sbc_immediate(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let value = bus.read(self.pc);
         self.pc += 1;
         let value = value ^ 0xFF;
 
@@ -2583,11 +2583,11 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn sbc_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn sbc_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
 
-        let value = self.read_bus(address) ^ 0xFF;
+        let value = bus.read(address) ^ 0xFF;
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
         let result_u16 = (self.a as u16) + (value as u16) + carry;
@@ -2603,12 +2603,12 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn sbc_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn sbc_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = address.wrapping_add(self.x) as u16;
-        let value = self.read_bus(final_address) ^ 0xFF;
+        let value = bus.read(final_address) ^ 0xFF;
 
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
@@ -2625,16 +2625,16 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn sbc_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn sbc_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let final_address = (high as u16) << 8 | (low as u16);
 
-        let value = self.read_bus(final_address) ^ 0xFF;
+        let value = bus.read(final_address) ^ 0xFF;
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
         let result_u16 = (self.a as u16) + (value as u16) + carry;
 
@@ -2650,11 +2650,11 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn sbc_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn sbc_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -2662,7 +2662,7 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address) ^ 0xFF;
+        let value = bus.read(final_address) ^ 0xFF;
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
         let result_u16 = (self.a as u16) + (value as u16) + carry;
         let result_u8 = result_u16 as u8;
@@ -2678,11 +2678,11 @@ impl Cpu {
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
 
-    fn sbc_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn sbc_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
 
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
 
         let base_address = (high as u16) << 8 | (low as u16);
@@ -2690,7 +2690,7 @@ impl Cpu {
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address) ^ 0xFF;
+        let value = bus.read(final_address) ^ 0xFF;
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
         let result_u16 = (self.a as u16) + (value as u16) + carry;
         let result_u8 = result_u16 as u8;
@@ -2704,17 +2704,18 @@ impl Cpu {
         self.a = result_u8;
         self.cycle += info.cycles as u64 + if page_crossed { 1 } else { 0 };
     }
-    fn sbc_indirectx(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+
+    fn sbc_indirectx(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
         let ptr_with_offset = ptr.wrapping_add(self.x);
 
-        let low = self.read_bus(ptr_with_offset as u16);
-        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let low = bus.read(ptr_with_offset as u16);
+        let high = bus.read(ptr_with_offset.wrapping_add(1) as u16);
         let final_address = (high as u16) << 8 | (low as u16);
 
-        let value = self.read_bus(final_address) ^ 0xFF;
+        let value = bus.read(final_address) ^ 0xFF;
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
         let result_u16 = (self.a as u16) + (value as u16) + carry;
@@ -2731,19 +2732,19 @@ impl Cpu {
         self.cycle += info.cycles as u64;
     }
 
-    fn sbc_indirecty(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn sbc_indirecty(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
 
-        let low = self.read_bus(ptr as u16);
-        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let low = bus.read(ptr as u16);
+        let high = bus.read(ptr.wrapping_add(1) as u16);
 
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
 
         let page_crossed = (base_address & 0xFF00) != (final_address & 0xFF00);
 
-        let value = self.read_bus(final_address) ^ 0xFF;
+        let value = bus.read(final_address) ^ 0xFF;
         let carry: u16 = if self.is_status_register_flag_active(StatusRegister::C) { 1 } else { 0 };
 
         let result_u16 = (self.a as u16) + (value as u16) + carry;
@@ -2776,124 +2777,124 @@ impl Cpu {
     }
     
     // STA
-    fn sta_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn sta_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
-        self.write_bus(address, self.a);
+        bus.write(address, self.a);
         self.cycle += info.cycles as u64;
     }
 
-    fn sta_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn sta_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
         let final_address = address.wrapping_add(self.x) as u16;
-        self.write_bus(final_address, self.a);
+        bus.write(final_address, self.a);
         self.cycle += info.cycles as u64;
     }
 
-    fn sta_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn sta_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
         let final_address = (high as u16) << 8 | (low as u16);
-        self.write_bus(final_address, self.a);
+        bus.write(final_address, self.a);
         self.cycle += info.cycles as u64;
     }
 
-    fn sta_absolutex(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn sta_absolutex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.x as u16);
-        self.write_bus(final_address, self.a);
+        bus.write(final_address, self.a);
         self.cycle += info.cycles as u64;
     }
 
-    fn sta_absolutey(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn sta_absolutey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
-        self.write_bus(final_address, self.a);
+        bus.write(final_address, self.a);
         self.cycle += info.cycles as u64;
     }
 
-    fn sta_indirectx(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn sta_indirectx(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
         let ptr_with_offset = ptr.wrapping_add(self.x);
-        let low = self.read_bus(ptr_with_offset as u16);
-        let high = self.read_bus(ptr_with_offset.wrapping_add(1) as u16);
+        let low = bus.read(ptr_with_offset as u16);
+        let high = bus.read(ptr_with_offset.wrapping_add(1) as u16);
         let final_address = (high as u16) << 8 | (low as u16);
-        self.write_bus(final_address, self.a);
+        bus.write(final_address, self.a);
         self.cycle += info.cycles as u64;
     }
 
-    fn sta_indirecty(&mut self, info: &OpcodeInfo) {
-        let ptr = self.read_bus(self.pc);
+    fn sta_indirecty(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let ptr = bus.read(self.pc);
         self.pc += 1;
-        let low = self.read_bus(ptr as u16);
-        let high = self.read_bus(ptr.wrapping_add(1) as u16);
+        let low = bus.read(ptr as u16);
+        let high = bus.read(ptr.wrapping_add(1) as u16);
         let base_address = (high as u16) << 8 | (low as u16);
         let final_address = base_address.wrapping_add(self.y as u16);
-        self.write_bus(final_address, self.a);
+        bus.write(final_address, self.a);
         self.cycle += info.cycles as u64;
     }
     
     // STX
-    fn stx_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn stx_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
-        self.write_bus(address, self.x);
+        bus.write(address, self.x);
         self.cycle += info.cycles as u64;
     }
 
-    fn stx_zeropagey(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn stx_zeropagey(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
         let final_address = address.wrapping_add(self.y) as u16;
-        self.write_bus(final_address, self.x);
+        bus.write(final_address, self.x);
         self.cycle += info.cycles as u64;
     }
 
-    fn stx_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn stx_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
         let final_address = (high as u16) << 8 | (low as u16);
-        self.write_bus(final_address, self.x);
+        bus.write(final_address, self.x);
         self.cycle += info.cycles as u64;
     }
     
     // STY
-    fn sty_zeropage(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc) as u16;
+    fn sty_zeropage(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc) as u16;
         self.pc += 1;
-        self.write_bus(address, self.y);
+        bus.write(address, self.y);
         self.cycle += info.cycles as u64;
     }
 
-    fn sty_zeropagex(&mut self, info: &OpcodeInfo) {
-        let address = self.read_bus(self.pc);
+    fn sty_zeropagex(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let address = bus.read(self.pc);
         self.pc += 1;
         let final_address = address.wrapping_add(self.x) as u16;
-        self.write_bus(final_address, self.y);
+        bus.write(final_address, self.y);
         self.cycle += info.cycles as u64;
     }
 
-    fn sty_absolute(&mut self, info: &OpcodeInfo) {
-        let low = self.read_bus(self.pc);
+    fn sty_absolute(&mut self, bus: &mut Bus, info: &OpcodeInfo) {
+        let low = bus.read(self.pc);
         self.pc += 1;
-        let high = self.read_bus(self.pc);
+        let high = bus.read(self.pc);
         self.pc += 1;
         let final_address = (high as u16) << 8 | (low as u16);
-        self.write_bus(final_address, self.y);
+        bus.write(final_address, self.y);
         self.cycle += info.cycles as u64;
     }
     
