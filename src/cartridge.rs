@@ -1,6 +1,15 @@
 use std::fs;
 use std::io;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Mirroring {
+    Horizontal,
+    Vertical,
+    FourScreen,
+    SingleScreenLower,
+    SingleScreenUpper,
+}
+
 pub struct Cartridge {
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,

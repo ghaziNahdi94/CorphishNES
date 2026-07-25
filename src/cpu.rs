@@ -394,10 +394,23 @@ impl Cpu {
             x: 0,
             y: 0,
             sp: 0xFD,
-            pc: 0x8000,
+            pc: 0x0000,
             sr: 0x24,
             cycle: 0,
         }
+    }
+
+    pub fn reset(&mut self, bus: &Bus) {
+        // read reset vector 0xFFFC-0xFFFD
+        let low = bus.read(0xFFFC);
+        let high = bus.read(0xFFFD);
+        self.pc = ((high as u16) << 8) | (low as u16);
+        
+        // Reset registers
+        self.sp = self.sp.wrapping_sub(3);  // decrement stack by 3
+        self.sr |= 0x04;  // flag I (interrupt disable) = 1
+        
+        self.cycle = 0;
     }
 
     // --- Flags ---
@@ -2937,7 +2950,7 @@ impl Cpu {
 #[cfg(test)]
 mod test {
    use super::*;
-   use crate::{bus::Bus, cartridge::Cartridge};
+   use crate::{bus::Bus, cartridge::Cartridge, mapper_nrom::MapperNROM};
  
    #[test]
    fn test_0xa9_lda_immediate_load_data() {
@@ -2954,8 +2967,10 @@ mod test {
         };
 
         bus.cartridge = Some(cartridge);
+        bus.mapper = Some(Box::new(MapperNROM::new()));
 
         let mut cpu: Cpu = Cpu::init();
+        cpu.pc = 0x8000;
 
         let mut index = 0;
         while index < instruction.len() {
@@ -2981,9 +2996,10 @@ mod test {
         };
 
         bus.cartridge = Some(cartridge);
-
+        bus.mapper = Some(Box::new(MapperNROM::new()));
 
         let mut cpu: Cpu = Cpu::init();
+        cpu.pc = 0x8000;
 
         let mut index = 0;
         while index < instruction.len() {
@@ -3006,9 +3022,10 @@ mod test {
         };
 
         bus.cartridge = Some(cartridge);
-
+        bus.mapper = Some(Box::new(MapperNROM::new()));
 
         let mut cpu: Cpu = Cpu::init();
+        cpu.pc = 0x8000;
         cpu.a = 10;
 
         let mut index = 0;
@@ -3034,8 +3051,10 @@ mod test {
         };
 
         bus.cartridge = Some(cartridge);
+        bus.mapper = Some(Box::new(MapperNROM::new()));
 
         let mut cpu: Cpu = Cpu::init();
+        cpu.pc = 0x8000;
         
         let mut index = 0;
         while index < instruction.len() {
@@ -3060,9 +3079,11 @@ mod test {
         };
 
         bus.cartridge = Some(cartridge);
+        bus.mapper = Some(Box::new(MapperNROM::new()));
 
 
         let mut cpu: Cpu = Cpu::init();
+        cpu.pc = 0x8000;
         cpu.x = 0xff;
 
         let mut index = 0;
