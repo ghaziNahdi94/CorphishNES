@@ -1,27 +1,28 @@
 use std::io;
 
-use crate::{bus::Bus, cartridge::Cartridge, cpu::Cpu, ppu::Ppu};
+use crate::{bus::Bus, cpu::Cpu};
 
 pub struct Emulator {
     cpu: Cpu,
-    ppu: Ppu,
     bus: Bus,
-    cartridge: Cartridge
 }
 
 impl Emulator {
     fn new() -> Emulator {
         Emulator {
             cpu: Cpu::init(),
-            ppu: Ppu::init(),
             bus: Bus::new(),
-            cartridge: Cartridge::load("").unwrap()
         }
     }
 
     pub fn load_rom(&mut self, path: &str) -> Result<(), io::Error> {
         self.bus.load_cartridge(path)?;
-        self.cpu.reset(&self.bus);
+        
+        if let Some(cartridge) = &self.bus.cartridge {
+            self.bus.init_ppu(&cartridge.chr_rom.clone(), cartridge.mirroring_type);
+        };
+
+        self.cpu.reset(&mut self.bus);
         Ok(())
     }
 

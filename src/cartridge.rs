@@ -1,3 +1,4 @@
+use core::fmt;
 use std::fs;
 use std::io;
 
@@ -10,12 +11,24 @@ pub enum Mirroring {
     SingleScreenUpper,
 }
 
+impl fmt::Display for Mirroring {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Horizontal => write!(f, "Horizontal"),
+            Self::Vertical => write!(f, "Vertical"),
+            Self::FourScreen => write!(f, "FourScreen"),
+            Self::SingleScreenLower => write!(f, "SingleScreenLower"),
+            Self::SingleScreenUpper => write!(f, "SingleScreenUpper"),
+        }
+    }
+}
+
 pub struct Cartridge {
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
     
     pub mapper: u8,
-    pub mirror_type: u8, // 0 = Horizontal, 1 = Vertical
+    pub mirroring_type: Mirroring
 }
 
 impl Cartridge {
@@ -46,7 +59,13 @@ impl Cartridge {
         let mapper = (flag_7 & 0xF0) | ((flag_6 & 0xF0) >> 4);
 
         // Calculate mirroring from Flag 6
-        let mirror_type = flag_6 & 0x01;
+        let mirroring_type = if flag_6 & 0x08 != 0 {
+            Mirroring::FourScreen
+        } else if flag_6 & 0x01 != 0 {
+            Mirroring::Vertical
+        } else {
+            Mirroring::Horizontal
+        };
 
         let has_trainer = (flag_6 & 0x04) != 0;
 
@@ -60,7 +79,7 @@ impl Cartridge {
         if bytes.len() < chr_rom_end {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "Corrupted file !",
+                "Corrupted file: not enough data",
             ));
         }
 
@@ -71,7 +90,7 @@ impl Cartridge {
             prg_rom,
             chr_rom,
             mapper,
-            mirror_type,
+            mirroring_type,
         })
     }
 }

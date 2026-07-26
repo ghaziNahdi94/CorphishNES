@@ -400,7 +400,7 @@ impl Cpu {
         }
     }
 
-    pub fn reset(&mut self, bus: &Bus) {
+    pub fn reset(&mut self, bus: &mut Bus) {
         // read reset vector 0xFFFC-0xFFFD
         let low = bus.read(0xFFFC);
         let high = bus.read(0xFFFD);
@@ -2963,7 +2963,7 @@ mod test {
             prg_rom: instruction.clone(),
             chr_rom: vec![],
             mapper: 0,
-            mirror_type: 0
+            mirroring_type: crate::cartridge::Mirroring::Horizontal
         };
 
         bus.cartridge = Some(cartridge);
@@ -2992,7 +2992,7 @@ mod test {
             prg_rom: instruction.clone(),
             chr_rom: vec![],
             mapper: 0,
-            mirror_type: 0
+            mirroring_type: crate::cartridge::Mirroring::Horizontal
         };
 
         bus.cartridge = Some(cartridge);
@@ -3018,7 +3018,7 @@ mod test {
             prg_rom: instruction.clone(),
             chr_rom: vec![],
             mapper: 0,
-            mirror_type: 0
+            mirroring_type: crate::cartridge::Mirroring::Horizontal
         };
 
         bus.cartridge = Some(cartridge);
@@ -3047,7 +3047,7 @@ mod test {
             prg_rom: instruction.clone(),
             chr_rom: vec![],
             mapper: 0,
-            mirror_type: 0
+            mirroring_type: crate::cartridge::Mirroring::Horizontal
         };
 
         bus.cartridge = Some(cartridge);
@@ -3075,7 +3075,7 @@ mod test {
             prg_rom: instruction.clone(),
             chr_rom: vec![],
             mapper: 0,
-            mirror_type: 0
+            mirroring_type: crate::cartridge::Mirroring::Horizontal
         };
 
         bus.cartridge = Some(cartridge);
