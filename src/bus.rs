@@ -6,6 +6,11 @@ pub struct Bus {
     pub cartridge: Option<Cartridge>,
     pub ppu: Option<Ppu>,
     pub mapper: Option<Box<dyn Mapper>>,
+    // === IO / Controllers ===
+
+    pub controller_state: [u8; 2],   // joystick (bit 0=A, 1=B, 2=Select, 3=Start, 4=Up, 5=Down, 6=Left, 7=Right)
+    controller_shift: [u8; 2],       // shift registers
+    controller_strobe: bool,         // Bit strobe active
 }
 
 impl Bus {
@@ -15,7 +20,10 @@ impl Bus {
             ram_cpu: [0; 2048],
             cartridge: None,
             ppu: None,
-            mapper: None
+            mapper: None,
+            controller_state: [0; 2],
+            controller_shift: [0; 2],
+            controller_strobe: false,
         }
     }
 
@@ -29,7 +37,30 @@ impl Bus {
                     0
                 }
             },
-            0x4000..=0x401F => 0, // APU TODO
+            0x4000..=0x401F => {
+                match address {
+                    // APU Status ($4015) — return 0 (there is no APU)
+                    0x4015 => 0,
+                
+                    // Controller 1 read ($4016)
+                    0x4016 => {
+                        let bit = self.controller_shift[0] & 0x01;
+                        self.controller_shift[0] >>= 1;
+                        self.controller_shift[0] |= 0x80; // NES shift-in  1 after 8 buttons
+                        bit
+                    }
+                
+                    // Controller 2 read ($4017)
+                    0x4017 => {
+                        let bit = self.controller_shift[1] & 0x01;
+                        self.controller_shift[1] >>= 1;
+                        self.controller_shift[1] |= 0x80;
+                        bit
+                    }
+                
+                    _ => 0,
+                }
+            },
             0x8000..=0xFFFF => {
                 if let (Some(cartridge), Some(mapper)) =  (&self.cartridge, &self.mapper) {
                     let rom_index = (address - 0x8000) as usize;
@@ -51,7 +82,46 @@ impl Bus {
                     ppu.write_cpu(0x2000 + (address & 0x07), value);
                 }
             },
-            0x4000..=0x401F => todo!(),
+            0x4000..=0x401F => {
+                match address {
+                    // APU registers ($4000-$4013, $4015, $4017)
+                    0x4000..=0x4013 | 0x4015 | 0x4017 => {
+                        // TODO
+                    }
+                
+                    // === OAMDMA ($4014) ===
+                    // Transfer 256 bytes from the page CPU to the PPU OAM 
+                    0x4014 => {
+                        let page = (value as u16) << 8;
+                        let mut buffer = [0u8; 256];
+                    
+                        // Lit la page CPU
+                        for i in 0..256 {
+                            buffer[i] = self.read(page + i as u16);
+                        }
+                    
+                        // Écrit dans l'OAM de la PPU
+                        if let Some(ppu) = self.ppu.as_mut() {
+                            let start = ppu.oam_address as usize;
+                            for i in 0..256 {
+                                ppu.oam[(start + i) & 0xFF] = buffer[i];
+                            }
+                        }
+                    }
+                
+                    // === Controller strobe ($4016) ===
+                    0x4016 => {
+                        self.controller_strobe = value & 0x01 != 0;
+                        if self.controller_strobe {
+                            // Quand strobe est haut, on recharge les shift registers
+                            self.controller_shift[0] = self.controller_state[0];
+                            self.controller_shift[1] = self.controller_state[1];
+                        }
+                    }
+                
+                    _ => {}
+                }
+            },
             0x8000..=0xFFFF => {
                 if let Some(mapper) = &mut self.mapper {
                     mapper.update_mapper_cpu(address, value);

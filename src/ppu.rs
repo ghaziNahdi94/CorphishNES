@@ -30,7 +30,7 @@ const NES_PALETTE: [(u8, u8, u8); 64] = [
 pub struct Ppu {
     vram: [u8; 4096],        // Nametables
     palette: [u8; 32],       // Palettes
-    oam: [u8; 256],          // Object Attribute Memory (64 sprites × 4 bytes)
+    pub oam: [u8; 256],          // Object Attribute Memory (64 sprites × 4 bytes)
 
     // Internal registers
     v: u16,                  // Current VRAM address (15 bits)
@@ -42,7 +42,7 @@ pub struct Ppu {
     ctrl: u8,
     mask: u8,
     status: u8,
-    oam_address: u8,
+    pub oam_address: u8,
     
     // $2007 read buffer (internal, not directly visible to CPU)
     ppu_data_latch: u8,
@@ -56,8 +56,10 @@ pub struct Ppu {
     cycle: u16,
     frames_counter: u64,
 
+    pub nmi_pending: bool,
+
     // Framebuffer RGB
-    framebuffer: [u8; 256 * 240 * 3],
+    pub framebuffer: [u8; 256 * 240 * 3],
 }
 
 impl Ppu {
@@ -85,20 +87,19 @@ impl Ppu {
             mirroring: mirroring,
             scanline: 261,        // Start on pre-render scanline
             cycle: 0,
+            nmi_pending: false,
             frames_counter: 0,
             framebuffer: [0; 256 * 240 * 3],
         }
     }
 
-    pub fn step(&mut self) -> bool {
-        let mut nmi_triggered = false;
-
+    pub fn step(&mut self) {
         if self.cycle == 1 {
             match self.scanline {
                 241 => {
                     self.status |= 0x80; // VBlank = 1
                     if self.ctrl & 0x80 != 0 {
-                        nmi_triggered = true;
+                        self.nmi_pending = true;
                     }
                 }
                 261 => {
@@ -112,9 +113,17 @@ impl Ppu {
         }
 
         // === Render (visible scanlines 0-239) ===
-        if self.scanline < 240 && self.cycle > 0 && self.cycle <= 256 {
+        let rendering_enabled = self.mask & 0x08 != 0;
+
+        if rendering_enabled && self.scanline < 240 && self.cycle > 0 && self.cycle <= 256 {
             let screen_x = (self.cycle - 1) as usize;
             let screen_y = self.scanline as usize;
+
+            // Base nametable CTRL (bits 0-1)
+            let nametable = (self.ctrl & 0x03) as u16;
+            let nametable_base = 0x2000u16 | (nametable << 10);
+            let attr_base = 0x23C0u16 | (nametable << 10);
+
 
             // Which tile on screen?
             let tile_x = (screen_x >> 3) as u8;
@@ -125,7 +134,6 @@ impl Ppu {
             let pixel_y = (screen_y & 0x07) as u8;
 
             // Read tile index from nametable
-            let nametable_base = 0x2000u16;
             let tile_addr = nametable_base + (tile_y as u16) * 32 + (tile_x as u16);
             let tile_index = self.read_vram(tile_addr) as u16;
 
@@ -135,26 +143,28 @@ impl Ppu {
             // Read pixel value (0-3) from pattern table
             let tile_pixel = self.get_tile_pixel(tile_index, ctrl_base_address, pixel_x, pixel_y);
 
-            // Get palette index from attribute table
-            let palette_index = self.get_palette_index(tile_x, tile_y);
+            // Attribute table
+            let attr_x = tile_x >> 2;
+            let attr_y = tile_y >> 2;
+            let attr_addr = attr_base + (attr_y as u16) * 8 + (attr_x as u16);
+            let attr_byte = self.read_vram(attr_addr);
+            let shift = ((tile_y & 0x02) << 1) | (tile_x & 0x02);
+            let palette_index = (attr_byte >> shift) & 0x03;
 
-            // Calculate palette address
+            // Palette address
             let palette_address = if tile_pixel == 0 {
-                0x3F00 // Background color (always transparent/color 0)
+                0x3F00
             } else {
                 0x3F00 + (palette_index as u16) * 4 + (tile_pixel as u16)
             };
-
-            // Read color index from palette
+        
             let color_index = self.read_vram(palette_address);
-
-            // Convert to RGB and write to framebuffer
             let (r, g, b) = NES_PALETTE[color_index as usize];
             let idx = (screen_y * 256 + screen_x) * 3;
-
-            self.framebuffer[idx] = r;     // Red
-            self.framebuffer[idx + 1] = g; // Green
-            self.framebuffer[idx + 2] = b; // Blue
+        
+            self.framebuffer[idx] = r;
+            self.framebuffer[idx + 1] = g;
+            self.framebuffer[idx + 2] = b;
         }
 
         self.cycle += 1;
@@ -165,9 +175,7 @@ impl Ppu {
                 self.scanline = 0;
                 self.frames_counter += 1;
             }
-        }
-
-        nmi_triggered
+        } 
     }
 
     fn get_tile_pixel(&self, tile_index: u16, ctrl_base_address: u16, pixel_x: u8, pixel_y: u8) -> u8 {
@@ -186,18 +194,6 @@ impl Ppu {
 
         // Combine into 2-bit color (0-3)
         ((pixel_high << 1) | pixel_low) as u8
-    }
-
-    fn get_palette_index(&self, tile_x: u8, tile_y: u8) -> u8 {
-        // Attribute table starts at $23C0
-        let attr_x = tile_x >> 2; // tile_x / 4
-        let attr_y = tile_y >> 2; // tile_y / 4
-        let attr_addr = 0x23C0u16 + (attr_y as u16) * 8 + (attr_x as u16);
-        let attr_byte = self.read_vram(attr_addr);
-
-        // Which 2-bit block in this byte?
-        let shift = ((tile_y & 0x02) << 1) | (tile_x & 0x02);
-        (attr_byte >> shift) & 0x03
     }
 
     // =========================================================================

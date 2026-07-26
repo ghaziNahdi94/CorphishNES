@@ -451,7 +451,8 @@ impl Cpu {
 
     // --- Execute ---
     
-    pub fn execute(&mut self, bus: &mut Bus) {
+    pub fn execute(&mut self, bus: &mut Bus) -> u64 {
+        let start_cycle = self.cycle;
         let opcode = bus.read(self.pc);
         self.pc += 1;
         
@@ -724,6 +725,34 @@ impl Cpu {
             // All illegal Opcodes
             _ => self.nop_implicit(info),
         }
+        
+        self.cycle - start_cycle 
+    }
+
+    pub fn trigger_nmi(&mut self, bus: &mut Bus) {
+        // Push PC high byte
+        let pc_high = (self.pc >> 8) as u8;
+        self.push(bus, pc_high);
+        
+        // Push PC low byte
+        let pc_low = (self.pc & 0xFF) as u8;
+        self.push(bus, pc_low);
+        
+        // Push status register with B=0, U=1
+        let sr = self.sr & !0x10; // Clear B flag
+        let sr = sr | 0x20;       // Set U flag
+        self.push(bus, sr);
+        
+        // Set I flag (disable interrupts)
+        self.set_status_register_flag(StatusRegister::I, true);
+        
+        // Read NMI vector from $FFFA-$FFFB
+        let nmi_low = bus.read(0xFFFA);
+        let nmi_high = bus.read(0xFFFB);
+        self.pc = ((nmi_high as u16) << 8) | (nmi_low as u16);
+        
+        // NMI takes 7 cycles
+        self.cycle += 7;
     }
 
     // =========================================================================
