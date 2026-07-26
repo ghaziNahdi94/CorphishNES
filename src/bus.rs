@@ -79,39 +79,3 @@ impl Bus {
         Ok(())
     }
 }
-
-
-
-
-FONCTION appliquer_mirroring(adresse) → adresse_mirroir
-    // Adresse dans la zone nametable : $2000-$2FFF
-    offset ← adresse ET 0x0FFF  // 0-4095
-    
-    SELON type_de_mirroring FAIRE
-        CAS Horizontal :
-            // $2000-$23FF et $2400-$27FF sont séparés
-            // $2800-$2BFF mirror $2000-$23FF
-            // $2C00-$2FFF mirror $2400-$27FF
-            SI offset ≥ 0x0800 ALORS
-                offset ← offset - 0x0800
-            FIN SI
-            RETOURNER 0x2000 + offset
-            
-        CAS Vertical :
-            // $2000-$27FF et $2800-$2FFF sont séparés
-            // $2400-$27FF mirror $2000-$23FF
-            // $2C00-$2FFF mirror $2800-$2BFF
-            SI offset ≥ 0x0800 ALORS
-                offset ← offset - 0x0800
-            FIN SI
-            RETOURNER 0x2000 + offset
-            
-        CAS FourScreen :
-            // Pas de mirroring, 4 nametables indépendantes
-            RETOURNER adresse
-            
-        CAS SingleScreen :
-            // Tout mirror sur une seule nametable
-            RETOURNER 0x2000 + (offset ET 0x03FF)
-    FIN SELON
-FIN FONCTION
