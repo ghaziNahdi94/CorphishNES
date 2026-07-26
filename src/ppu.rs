@@ -93,7 +93,7 @@ impl Ppu {
         }
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self) {        
         if self.cycle == 1 {
             match self.scanline {
                 241 => {

@@ -1,5 +1,3 @@
-use std::{thread, time::{Duration, Instant}};
-
 use minifb::{Key, Window, WindowOptions};
 use crate::emulator::Emulator;
 
@@ -18,8 +16,6 @@ mod mapper_unrom;
 
 const WIDTH: usize = 256;
 const HEIGHT: usize = 240;
-const TARGET_FPS: u64 = 60;
-const FRAME_TIME: Duration = Duration::from_nanos(1_000_000_000 / TARGET_FPS); // ~16.67ms
 
 fn main() {
 
@@ -37,10 +33,24 @@ fn main() {
         WindowOptions::default(),
     ).expect("Failed to create window");
 
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        let frame_start = Instant::now();
+    window.set_target_fps(60);
 
-        // Exécute une frame complète
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+
+        let mut controller = 0u8;
+        if window.is_key_down(Key::Z)      { controller |= 0x01; } // A
+        if window.is_key_down(Key::X)      { controller |= 0x02; } // B
+        if window.is_key_down(Key::Enter)  { controller |= 0x04; } // Select
+        if window.is_key_down(Key::Space)  { controller |= 0x08; } // Start
+        if window.is_key_down(Key::Up)     { controller |= 0x10; } // Up
+        if window.is_key_down(Key::Down)   { controller |= 0x20; } // Down
+        if window.is_key_down(Key::Left)   { controller |= 0x40; } // Left
+        if window.is_key_down(Key::Right)  { controller |= 0x80; } // Right
+        
+        emulator.bus.controller_state[0] = controller;
+
+
+        // execute a Frame
         emulator.run_frame();
 
         // Get framebuffer and convert to u32 RGB
@@ -57,11 +67,5 @@ fn main() {
 
         window.update_with_buffer(&buffer, WIDTH, HEIGHT)
             .expect("Failed to update window");
-
-        // Manual frame rate limiting
-        let elapsed = frame_start.elapsed();
-        if elapsed < FRAME_TIME {
-            thread::sleep(FRAME_TIME - elapsed);
-        }
     }
 }

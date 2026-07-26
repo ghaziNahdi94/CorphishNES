@@ -4,7 +4,7 @@ use crate::{bus::Bus, cpu::Cpu};
 
 pub struct Emulator {
     cpu: Cpu,
-    bus: Bus,
+    pub bus: Bus,
 }
 
 impl Emulator {
