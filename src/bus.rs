@@ -95,17 +95,20 @@ impl Bus {
                         let page = (value as u16) << 8;
                         let mut buffer = [0u8; 256];
                     
-                        // Lit la page CPU
+                        // Read CPU page
                         for i in 0..256 {
                             buffer[i] = self.read(page + i as u16);
                         }
                     
-                        // Écrit dans l'OAM de la PPU
+                        // write on the OAM of the PPU
                         if let Some(ppu) = self.ppu.as_mut() {
                             let start = ppu.oam_address as usize;
                             for i in 0..256 {
                                 ppu.oam[(start + i) & 0xFF] = buffer[i];
                             }
+                            // NES: oam_address wraps to 0 after DMA (or stays? actually it wraps)
+                            ppu.oam_address = ppu.oam_address.wrapping_add(0); // stays, but DMA always writes full page
+
                         }
                     }
                 
@@ -113,7 +116,7 @@ impl Bus {
                     0x4016 => {
                         self.controller_strobe = value & 0x01 != 0;
                         if self.controller_strobe {
-                            // Quand strobe est haut, on recharge les shift registers
+                            // Set shift register when strbe = 1
                             self.controller_shift[0] = self.controller_state[0];
                             self.controller_shift[1] = self.controller_state[1];
                         }

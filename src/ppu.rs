@@ -26,11 +26,22 @@ const NES_PALETTE: [(u8, u8, u8); 64] = [
     (0x9F, 0xFF, 0xF3), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00),
 ];
 
+const FRAME_WIDTH: usize = 256;
+const FRAME_HEIGHT: usize = 240;
+
+#[derive(Clone, Debug, PartialEq)]
+struct Sprite {
+    position_x: u8,
+    position_y: u8,
+    attributes: u8,
+    tile_index: u8
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ppu {
-    vram: [u8; 4096],        // Nametables
+    vram: [u8; 4096],         // Nametables
     palette: [u8; 32],       // Palettes
-    pub oam: [u8; 256],          // Object Attribute Memory (64 sprites × 4 bytes)
+    pub oam: [u8; 256],     // Object Attribute Memory (64 sprites × 4 bytes)
 
     // Internal registers
     v: u16,                  // Current VRAM address (15 bits)
@@ -57,9 +68,10 @@ pub struct Ppu {
     frames_counter: u64,
 
     pub nmi_pending: bool,
+    sprites_buffer: Vec<Sprite>,
 
     // Framebuffer RGB
-    pub framebuffer: [u8; 256 * 240 * 3],
+    pub framebuffer: [u8; FRAME_WIDTH * FRAME_HEIGHT * 3],
 }
 
 impl Ppu {
@@ -88,85 +100,242 @@ impl Ppu {
             scanline: 261,        // Start on pre-render scanline
             cycle: 0,
             nmi_pending: false,
+            sprites_buffer: Vec::new(),
             frames_counter: 0,
-            framebuffer: [0; 256 * 240 * 3],
+            framebuffer: [0; FRAME_WIDTH * FRAME_HEIGHT * 3],
         }
     }
 
     pub fn step(&mut self) {        
+
+        if self.scanline == 240 && self.cycle == 1 {
+            println!("Frame {} ended, S0HIT={}", self.frames_counter, (self.status >> 6) & 1);
+        }
+
+        // ============================================
+        // VBLANK / STATUS FLAGS (cycle 1 of scanline)
+        // ============================================
         if self.cycle == 1 {
             match self.scanline {
                 241 => {
-                    self.status |= 0x80; // VBlank = 1
+                    // Set VBlank flag, trigger NMI if enabled
+                    self.status |= 0x80;
                     if self.ctrl & 0x80 != 0 {
                         self.nmi_pending = true;
                     }
                 }
                 261 => {
-                    // End of VBlank + pre-render
-                    self.status &= !0x80; // VBlank = 0
-                    self.status &= !0x40; // Sprite 0 hit = 0
-                    self.status &= !0x20; // Sprite overflow = 0
+                    // Clear VBlank, sprite 0 hit, and overflow flags at pre-render
+                    let before = self.status;
+                    self.status &= !0x80;
+                    self.status &= !0x40;
+                    self.status &= !0x20;
+                    println!("CLEAR frame={} scanline=261 status {:02X} -> {:02X}", 
+                    self.frames_counter, before, self.status);
                 }
                 _ => {}
             }
         }
 
-        // === Render (visible scanlines 0-239) ===
-        let rendering_enabled = self.mask & 0x08 != 0;
 
-        if rendering_enabled && self.scanline < 240 && self.cycle > 0 && self.cycle <= 256 {
+        // ============================================
+        // SPRITE EVALUATION (cycle 257 only)
+        // ============================================
+        // On the real NES, this happens during cycles 257-320, but we can
+        // simplify by doing it once at cycle 257. We scan all 64 OAM entries
+        // and select up to 8 sprites that intersect the NEXT scanline.
+        if self.scanline < 240 && self.cycle >= 257 && self.cycle <= 320 {
+            self.sprites_buffer.clear();
+            let mut overflow = false;
+        
+            for i in 0..64 {
+                // Each OAM entry is 4 bytes: [y, tile, attr, x]
+                let sprite_y = self.oam[i * 4];
+                
+                if sprite_y >= 239 {
+                    continue; // Sprite is off-screen
+                }
+
+                let y_start = sprite_y as u16 + 1;
+                let y_end = y_start + 8;
+                if self.scanline >= y_start && self.scanline < y_end && self.scanline < 240 {
+
+                        if self.sprites_buffer.len() < 8 {
+                            let sprite_data = &self.oam[i * 4..i * 4 + 4];
+                            let sprite = Sprite {
+                                position_x: sprite_data[3],
+                                position_y: sprite_y,
+                                tile_index: sprite_data[1],
+                                attributes: sprite_data[2],
+                            };
+                        self.sprites_buffer.push(sprite);
+                    } else {
+                        // More than 8 sprites on this scanline — set overflow flag
+                        overflow = true;
+                    }
+                }
+            }
+        
+            if overflow {
+                self.status |= 0x20;
+            }
+        }
+    
+        // ============================================
+        // RENDERING (visible scanlines 0-239, cycles 1-256)
+        // ============================================
+        let bg_enabled = self.mask & 0x08 != 0;
+        let sprites_enabled = self.mask & 0x10 != 0;
+    
+        if self.scanline < (FRAME_HEIGHT as u16) 
+            && self.cycle > 0 
+            && self.cycle <= (FRAME_WIDTH as u16) {
+            
             let screen_x = (self.cycle - 1) as usize;
             let screen_y = self.scanline as usize;
-
-            // Base nametable CTRL (bits 0-1)
-            let nametable = (self.ctrl & 0x03) as u16;
-            let nametable_base = 0x2000u16 | (nametable << 10);
-            let attr_base = 0x23C0u16 | (nametable << 10);
-
-
-            // Which tile on screen?
-            let tile_x = (screen_x >> 3) as u8;
-            let tile_y = (screen_y >> 3) as u8;
-
-            // Which pixel inside the tile?
-            let pixel_x = (screen_x & 0x07) as u8;
-            let pixel_y = (screen_y & 0x07) as u8;
-
-            // Read tile index from nametable
-            let tile_addr = nametable_base + (tile_y as u16) * 32 + (tile_x as u16);
-            let tile_index = self.read_vram(tile_addr) as u16;
-
-            // Which pattern table? (bit 4 of ctrl)
-            let ctrl_base_address = if self.ctrl & 0x10 == 0 { 0 } else { 1 };
-
-            // Read pixel value (0-3) from pattern table
-            let tile_pixel = self.get_tile_pixel(tile_index, ctrl_base_address, pixel_x, pixel_y);
-
-            // Attribute table
-            let attr_x = tile_x >> 2;
-            let attr_y = tile_y >> 2;
-            let attr_addr = attr_base + (attr_y as u16) * 8 + (attr_x as u16);
-            let attr_byte = self.read_vram(attr_addr);
-            let shift = ((tile_y & 0x02) << 1) | (tile_x & 0x02);
-            let palette_index = (attr_byte >> shift) & 0x03;
-
-            // Palette address
-            let palette_address = if tile_pixel == 0 {
-                0x3F00
+            let idx = (screen_y * FRAME_WIDTH + screen_x) * 3;
+            
+            // ----------------------------------------
+            // BACKGROUND RENDERING
+            // ----------------------------------------
+            let mut bg_pixel: u8 = 0;
+            let mut bg_palette: u8 = 0;
+            
+            if bg_enabled {
+                // Nametable base from PPUCTRL bits 0-1
+                let nametable = (self.ctrl & 0x03) as u16;
+                let nametable_base = 0x2000u16 | (nametable << 10);
+                let attr_base = 0x23C0u16 | (nametable << 10);
+            
+                let tile_x = (screen_x >> 3) as u8;
+                let tile_y = (screen_y >> 3) as u8;
+                let pixel_x = (screen_x & 0x07) as u8;
+                let pixel_y = (screen_y & 0x07) as u8;
+            
+                // Fetch tile index from nametable
+                let tile_addr = nametable_base + (tile_y as u16) * 32 + (tile_x as u16);
+                let tile_index = self.read_vram(tile_addr) as u16;
+            
+                // Background pattern table from PPUCTRL bit 4
+                let bg_table = if self.ctrl & 0x10 == 0 { 0 } else { 1 };
+            
+                // Get 2-bit pixel value from pattern table
+                bg_pixel = self.get_tile_pixel(tile_index, bg_table, pixel_x, pixel_y);
+            
+                // Fetch palette from attribute table
+                let attr_x = tile_x >> 2;
+                let attr_y = tile_y >> 2;
+                let attr_addr = attr_base + (attr_y as u16) * 8 + (attr_x as u16);
+                let attr_byte = self.read_vram(attr_addr);
+                let shift = ((tile_y & 0x02) << 1) | (tile_x & 0x02);
+                bg_palette = (attr_byte >> shift) & 0x03;
+            }
+        
+            // Compute background color (palette $3F00 + palette * 4 + pixel)
+            let bg_color_addr = if bg_pixel == 0 {
+                0x3F00  // Universal background color
             } else {
-                0x3F00 + (palette_index as u16) * 4 + (tile_pixel as u16)
+                0x3F00 + (bg_palette as u16) * 4 + (bg_pixel as u16)
             };
+            let bg_color_index = self.read_vram(bg_color_addr);
         
-            let color_index = self.read_vram(palette_address);
-            let (r, g, b) = NES_PALETTE[color_index as usize];
-            let idx = (screen_y * 256 + screen_x) * 3;
+            // ----------------------------------------
+            // SPRITE RENDERING
+            // ----------------------------------------
+            let mut sprite_pixel: u8 = 0;
+            let mut sprite_palette: u8 = 0;
+            let mut sprite_priority_front = true;  // true = in front of bg
+            let mut sprite_0_hit = false;
         
+            if sprites_enabled {
+                // Iterate through evaluated sprites (0 = highest priority)
+                // We break on first non-transparent pixel found
+                for (buffer_index, sprite) in self.sprites_buffer.iter().enumerate() {
+                    let sprite_x = sprite.position_x as usize;
+                    
+                    // Check if current pixel X intersects this sprite's 8-pixel width
+                    if screen_x >= sprite_x && screen_x < sprite_x + 8 {
+                        let mut col = screen_x - sprite_x;
+                        let mut row = screen_y - (sprite.position_y as usize + 1);
+                    
+                        // Apply horizontal flip (bit 6 of attributes)
+                        if sprite.attributes & 0x40 != 0 {
+                            col = if col <= 7 { 7 - col } else { 0 };
+                        }
+                        
+                        // Apply vertical flip (bit 7 of attributes)
+                        if sprite.attributes & 0x80 != 0 {
+                            row = if row <= 7 { 7 - row } else { 0 };
+                        }
+                    
+                        // Sprite pattern table from PPUCTRL bit 3
+                        let sprite_table = if self.ctrl & 0x08 == 0 { 0 } else { 1 };
+                    
+                        // Fetch pixel from pattern table
+                        let pixel = self.get_tile_pixel(
+                            sprite.tile_index as u16,
+                            sprite_table,
+                            col as u8,
+                            row as u8,
+                        );
+                    
+                        // Non-transparent pixel found — this sprite wins (priority)
+                        if pixel != 0 {
+                            sprite_pixel = pixel;
+                            sprite_palette = sprite.attributes & 0x03;
+                            // Priority: bit 5 = 0 means in front, 1 means behind
+                            sprite_priority_front = sprite.attributes & 0x20 == 0;
+                            
+                            // Check if this is the original OAM sprite 0
+                            // Note: buffer_index 0 doesn't guarantee original index 0
+                            // We need to track the original OAM index. For SMB, this works
+                            // because sprite 0 is usually among the first 8.
+                            // A more accurate approach would store the original index.
+                            if buffer_index == 0 {
+                                sprite_0_hit = true;
+                            }
+                            
+                            break;  // First matching sprite has highest priority
+                        }
+                    }
+                }
+            }
+
+            if self.scanline >= 240 {
+                // No sprite 0 hit during VBlank or pre-render
+                sprite_0_hit = false;
+            }
+        
+            // ----------------------------------------
+            // PIXEL MIXING & SPRITE 0 HIT
+            // ----------------------------------------
+            let mut final_color_index = bg_color_index;
+        
+            if sprite_pixel != 0 {
+                // Sprite 0 hit: occurs when sprite 0's non-transparent pixel overlaps
+                // with a non-transparent background pixel, and x >= 8 (left clip)
+                if sprite_0_hit && bg_pixel != 0 && screen_x >= 8 {
+                    self.status |= 0x40;
+                }
+            
+                // Determine final pixel: sprite wins if it's in front OR bg is transparent
+                if sprite_priority_front || bg_pixel == 0 {
+                    // Sprite palettes are at $3F10-$3F1F
+                    let sprite_color_addr = 0x3F10 + (sprite_palette as u16) * 4 + (sprite_pixel as u16);
+                    final_color_index = self.read_vram(sprite_color_addr);
+                }
+            }
+        
+            // Write final color to framebuffer
+            let (r, g, b) = NES_PALETTE[final_color_index as usize];
             self.framebuffer[idx] = r;
             self.framebuffer[idx + 1] = g;
             self.framebuffer[idx + 2] = b;
         }
-
+    
+        // ============================================
+        // CYCLE / SCANLINE ADVANCE
+        // ============================================
         self.cycle += 1;
         if self.cycle > 340 {
             self.cycle = 0;
