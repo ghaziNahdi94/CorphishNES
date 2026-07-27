@@ -287,6 +287,14 @@ impl Ppu {
         }
     }
 
+    fn vram_address_increment(&self) -> u16 {
+        if self.control_register & CONTROL_FLAG_VRAM_INCREMENT_32 == 0 {
+            1
+        } else {
+            32
+        }
+    }
+
     // =========================================================================
     // MAIN STEP FUNCTION
     // =========================================================================
@@ -1072,11 +1080,7 @@ impl Ppu {
 
                 // After every read, the VRAM address auto-increments by 1 or 32,
                 // depending on the control register setting.
-                let increment = if self.control_register & CONTROL_FLAG_VRAM_INCREMENT_32 == 0 {
-                    1
-                } else {
-                    32
-                };
+                let increment = self.vram_address_increment();
                 self.current_vram_address = self.current_vram_address.wrapping_add(increment);
 
                 value
@@ -1193,11 +1197,7 @@ impl Ppu {
             // After writing, the address auto-increments by 1 or 32.
             0x2007 => {
                 self.write_video_memory(self.current_vram_address, value);
-                let increment = if self.control_register & CONTROL_FLAG_VRAM_INCREMENT_32 == 0 {
-                    1
-                } else {
-                    32
-                };
+                let increment = self.vram_address_increment();
                 self.current_vram_address = self.current_vram_address.wrapping_add(increment);
             }
 
@@ -1218,32 +1218,40 @@ impl Ppu {
         // The PPU only has a 14-bit address bus, so we mask to $3FFF.
         let address = address & 0x3FFF;
 
-        if address < 0x2000 {
-            // Pattern table data comes from the cartridge CHR ROM/RAM.
-            let index = address as usize;
-            if index < self.cartridge_chr_data.len() {
-                self.cartridge_chr_data[index]
-            } else {
-                // If the cartridge data is smaller than expected, return 0.
-                0
-            }
-        } else if address < 0x3F00 {
-            // Name table data comes from internal VRAM, but the 4 name tables
-            // may be mirrored depending on the cartridge's mirroring setting.
-            let mirrored_address = self.apply_mirroring(address);
-            self.name_table_vram[(mirrored_address - 0x2000) as usize]
-        } else {
-            // Palette RAM. Only 32 bytes are actually used.
-            let mut palette_index = address & 0x1F;
-
-            // The NES has a quirk: every 4th color in the sprite palettes
-            // mirrors the corresponding background palette color.
-            // So $3F10 mirrors $3F00, $3F14 mirrors $3F04, etc.
-            if palette_index >= 0x10 && (palette_index & 0x03) == 0 {
-                palette_index -= 0x10;
+        match address {
+            0..=0x1fff=> {
+                // Pattern table data comes from the cartridge CHR ROM/RAM.
+                let index = address as usize;
+                if index < self.cartridge_chr_data.len() {
+                    self.cartridge_chr_data[index]
+                } else {
+                    // If the cartridge data is smaller than expected, return 0.
+                    0
+                }
             }
 
-            self.palette_ram[palette_index as usize]
+           0x2000..=0x2fff => {
+                // Name table data comes from internal VRAM, but the 4 name tables
+                // may be mirrored depending on the cartridge's mirroring setting.
+                let mirrored_address = self.apply_mirroring(address);
+                self.name_table_vram[(mirrored_address - 0x2000) as usize]
+           },
+
+           0x3000..=0x3eff => panic!("addr space 0x3000..0x3eff is not expected to be used, requested = {} ", address),
+           0x3f00..=0x3fff => {
+                // Palette RAM. Only 32 bytes are actually used.
+                let mut palette_index = address & 0x1F;
+
+                // The NES has a quirk: every 4th color in the sprite palettes
+                // mirrors the corresponding background palette color.
+                // So $3F10 mirrors $3F00, $3F14 mirrors $3F04, etc.
+                if palette_index >= 0x10 && (palette_index & 0x03) == 0 {
+                    palette_index -= 0x10;
+                }
+
+                self.palette_ram[palette_index as usize]
+           },
+           _ => 0 
         }
     }
 
