@@ -27,7 +27,7 @@ impl Emulator {
     }
 
     pub fn get_framebuffer(&self) -> &[u8; 256 * 240 * 3] {
-        &self.bus.ppu.as_ref().unwrap().framebuffer
+        &self.bus.ppu.as_ref().unwrap().screen_pixels
     }
 
     pub fn run_frame(&mut self) {
@@ -38,8 +38,8 @@ impl Emulator {
     
         while ppu_cycles_this_frame < PPU_CYCLES_PER_FRAME {
             // Handle NMI interruption
-            if self.bus.ppu.as_ref().unwrap().nmi_pending {
-                self.bus.ppu.as_mut().unwrap().nmi_pending = false;
+            if self.bus.ppu.as_ref().unwrap().nmi_interrupt_pending {
+                self.bus.ppu.as_mut().unwrap().nmi_interrupt_pending = false;
                 self.cpu.trigger_nmi(&mut self.bus);
             }
         
