@@ -57,9 +57,10 @@ pub struct Ppu {
     pub nmi_pending: bool,
     sprites_buffer: Vec<Sprite>,
     pub framebuffer: [u8; FRAME_WIDTH * FRAME_HEIGHT * 3],
-    v_start_of_scanline: u16,
-    // Pour le sprite 0 hit : le PPU a un délai de pipeline interne
-    sprite_0_hit_delay: bool,
+    // Pour sauvegarder v au bon moment
+    v_render: u16,  // v sauvegardé juste après la copie de t (cycle 257)
+    // Pour retarder le sprite 0 hit de 1 pixel
+    sprite_0_hit_x: Option<u16>,
 }
 
 impl Ppu {
@@ -91,8 +92,8 @@ impl Ppu {
             sprites_buffer: Vec::new(),
             frames_counter: 0,
             framebuffer: [0; FRAME_WIDTH * FRAME_HEIGHT * 3],
-            v_start_of_scanline: 0,
-            sprite_0_hit_delay: false,
+            v_render: 0,
+            sprite_0_hit_x: None,
         }
     }
 
@@ -114,24 +115,25 @@ impl Ppu {
                     self.status &= !0x80;
                     self.status &= !0x40;
                     self.status &= !0x20;
-                    self.sprite_0_hit_delay = false;
                 }
                 _ => {}
             }
         }
 
         // ============================================
-        // SAUVEGARDE DE v AU DÉBUT DE LA SCANLINE
+        // SAUVEGARDE DE v POUR LE RENDU (cycle 257)
         // ============================================
-        if self.cycle == 0 && (self.scanline < 240 || self.scanline == 261) {
-            self.v_start_of_scanline = self.v;
+        // Le PPU copie t -> v à cycle 257. On sauvegarde v juste après cette copie
+        // pour l'utiliser comme référence pour le rendu de la scanline suivante.
+        if (self.scanline < 240 || self.scanline == 261) && self.cycle == 258 {
+            self.v_render = self.v;
         }
 
         // ============================================
         // SCROLLING & VRAM ADDRESS UPDATES
         // ============================================
         if rendering_enabled {
-            // Incrément horizontal de coarse X tous les 8 cycles
+            // Incrément horizontal de coarse X tous les 8 cycles (pour les lectures CPU)
             if self.scanline < 240 || self.scanline == 261 {
                 if (self.cycle > 0 && self.cycle <= 256 && self.cycle % 8 == 0) ||
                    (self.cycle >= 321 && self.cycle <= 336 && self.cycle % 8 == 0) {
@@ -223,20 +225,18 @@ impl Ppu {
             let idx = (screen_y * FRAME_WIDTH + screen_x) * 3;
 
             // ----------------------------------------
-            // BACKGROUND RENDERING - CORRECTION fine_x
+            // BACKGROUND RENDERING
             // ----------------------------------------
             let mut bg_pixel: u8 = 0;
             let mut bg_palette: u8 = 0;
 
             if bg_enabled {
                 let fine_x = self.x;
-                let fine_y = (self.v_start_of_scanline >> 12) & 0x07;
-                let coarse_x = self.v_start_of_scanline & 0x1F;
-                let coarse_y = (self.v_start_of_scanline >> 5) & 0x1F;
-                let nt = (self.v_start_of_scanline >> 10) & 0x03;
+                let fine_y = (self.v_render >> 12) & 0x07;
+                let coarse_x = self.v_render & 0x1F;
+                let coarse_y = (self.v_render >> 5) & 0x1F;
+                let nt = (self.v_render >> 10) & 0x03;
 
-                // CORRECTION : Quand fine_x > 0, le premier tile commence "avant" l'écran
-                // On doit soustraire fine_x pour avoir la bonne position de tile
                 let effective_screen_x = screen_x as u16 + fine_x as u16;
                 let tile_col = coarse_x + (effective_screen_x / 8);
                 let pixel_x = (effective_screen_x % 8) as u8;
@@ -245,7 +245,6 @@ impl Ppu {
                 let mut current_nt = nt;
                 let mut final_tile_col = tile_col;
                 
-                // Wrap-around du nametable horizontal
                 if tile_col >= 32 {
                     current_nt ^= 1;
                     final_tile_col = tile_col & 0x1F;
@@ -275,17 +274,62 @@ impl Ppu {
             let bg_color_index = self.read_vram(bg_color_addr);
 
             // ----------------------------------------
-            // SPRITE RENDERING - CORRECTION : ordre inverse
+            // SPRITE 0 HIT (détecté 1 pixel en avance, appliqué 1 pixel plus tard)
+            // ----------------------------------------
+            // Appliquer le hit retardé du pixel précédent
+            if self.sprite_0_hit_x == Some(self.cycle - 1) {
+                self.status |= 0x40;
+                self.sprite_0_hit_x = None;
+            }
+
+            // Détecter le sprite 0 hit pour le pixel courant
+            let mut sprite_0_detected = false;
+            if sprites_enabled && bg_enabled && self.sprite_0_hit_x.is_none() && (self.status & 0x40) == 0 {
+                for sprite in self.sprites_buffer.iter() {
+                    if sprite.oam_index != 0 {
+                        continue;
+                    }
+                    
+                    let sprite_x = sprite.position_x as usize;
+                    if screen_x >= sprite_x && screen_x < sprite_x + 8 {
+                        let mut col = screen_x - sprite_x;
+                        let mut row = screen_y.wrapping_sub((sprite.position_y as usize).wrapping_add(1));
+                        
+                        if col < 8 && row < 8 {
+                            if sprite.attributes & 0x40 != 0 { col = 7 - col; }
+                            if sprite.attributes & 0x80 != 0 { row = 7 - row; }
+                            
+                            let sprite_table = if self.ctrl & 0x08 == 0 { 0 } else { 1 };
+                            let pixel = self.get_tile_pixel(sprite.tile_index as u16, sprite_table, col as u8, row as u8);
+                            
+                            if pixel != 0 && bg_pixel != 0 {
+                                let left_clip_bg = (self.mask & 0x02) != 0;
+                                let left_clip_spr = (self.mask & 0x04) != 0;
+                                let in_left_clip = screen_x < 8;
+                                let clipped = in_left_clip && (left_clip_bg || left_clip_spr);
+                                
+                                if screen_x != 255 && !clipped {
+                                    sprite_0_detected = true;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            
+            if sprite_0_detected {
+                self.sprite_0_hit_x = Some(self.cycle);
+            }
+
+            // ----------------------------------------
+            // SPRITE RENDERING (ordre inverse pour la priorité)
             // ----------------------------------------
             let mut sprite_pixel: u8 = 0;
             let mut sprite_palette: u8 = 0;
             let mut sprite_priority_front = true;
-            let mut sprite_0_hit_this_pixel = false;
 
             if sprites_enabled {
-                // CORRECTION : Sur NES, les sprites sont rendus de l'index 63 vers 0
-                // Le sprite avec l'index le plus BAS apparaît par-dessus
-                // Donc on parcourt le buffer à l'envers pour le rendu
                 for sprite in self.sprites_buffer.iter().rev() {
                     let sprite_x = sprite.position_x as usize;
 
@@ -304,12 +348,7 @@ impl Ppu {
                                 sprite_pixel = pixel;
                                 sprite_palette = sprite.attributes & 0x03;
                                 sprite_priority_front = sprite.attributes & 0x20 == 0;
-
-                                if sprite.oam_index == 0 {
-                                    sprite_0_hit_this_pixel = true;
-                                }
-                                // On ne fait PAS break ici car on veut que le sprite 0 
-                                // (qui est en premier dans le buffer) soit prioritaire
+                                break;
                             }
                         }
                     }
@@ -317,32 +356,11 @@ impl Ppu {
             }
 
             // ----------------------------------------
-            // PIXEL MIXING & SPRITE 0 HIT
+            // PIXEL MIXING
             // ----------------------------------------
             let mut final_color_index = bg_color_index;
 
             if sprite_pixel != 0 {
-                // CORRECTION : Sprite 0 hit avec timing précis
-                // Le hit ne se produit que si le sprite 0 est VRAIMENT visible
-                // (pas masqué par un autre sprite avec priorité plus haute)
-                if sprite_0_hit_this_pixel && bg_pixel != 0 {
-                    let left_clip_bg = (self.mask & 0x02) != 0;
-                    let left_clip_spr = (self.mask & 0x04) != 0;
-                    
-                    let in_left_clip = screen_x < 8;
-                    let clipped = in_left_clip && (left_clip_bg || left_clip_spr);
-                    
-                    // Le sprite 0 hit ne se produit PAS au pixel 255
-                    // et il y a un léger délai de pipeline (on le décale de 1 pixel)
-                    if screen_x != 255 && !clipped && !self.sprite_0_hit_delay {
-                        // Décalage de 1 pixel pour le pipeline du PPU
-                        if screen_x >= 1 {
-                            self.status |= 0x40;
-                            self.sprite_0_hit_delay = true;
-                        }
-                    }
-                }
-
                 if sprite_priority_front || bg_pixel == 0 {
                     let sprite_color_addr = 0x3F10 + (sprite_palette as u16) * 4 + (sprite_pixel as u16);
                     final_color_index = self.read_vram(sprite_color_addr);
