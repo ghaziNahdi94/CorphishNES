@@ -102,12 +102,12 @@ impl Bus {
                     
                         // write on the OAM of the PPU
                         if let Some(ppu) = self.ppu.as_mut() {
-                            let start = ppu.oam_address as usize;
+                            let start = ppu.oam_address_register as usize;
                             for i in 0..256 {
-                                ppu.oam[(start + i) & 0xFF] = buffer[i];
+                                ppu.sprite_oam[(start + i) & 0xFF] = buffer[i];
                             }
                             // NES: oam_address wraps to 0 after DMA (or stays? actually it wraps)
-                            ppu.oam_address = ppu.oam_address.wrapping_add(0); // stays, but DMA always writes full page
+                            ppu.oam_address_register = ppu.oam_address_register.wrapping_add(0); // stays, but DMA always writes full page
 
                         }
                     }
