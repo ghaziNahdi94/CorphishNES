@@ -27,7 +27,7 @@ fn main() {
     }
 
     let mut window = Window::new(
-        "NES Emulator",
+        "CorphishNES Emulator",
         WIDTH,
         HEIGHT,
         WindowOptions {
