@@ -340,12 +340,12 @@ impl Ppu {
         }
 
         // -------------------------------------------------------------------
-        // STEP 4: FIND WHICH SPRITES ARE VISIBLE ON THIS SCANLINE
+        // STEP 4: FIND WHICH SPRITES ARE VISIBLE for the NEXT SCANLINE
         // -------------------------------------------------------------------
         // At cycle 257, the PPU looks through all 64 sprites and checks
-        // which ones overlap the current scanline. It can only remember 8.
+        // which ones overlap the next scanline. It can only remember 8.
         if rendering_is_turned_on && self.current_scanline < 240 && self.current_cycle == 257 {
-            self.find_visible_sprites_for_this_scanline();
+            self.find_visible_sprites_for_next_scanline();
         }
 
         // -------------------------------------------------------------------
@@ -563,7 +563,7 @@ impl Ppu {
     // The PPU looks at all 64 sprites and checks which ones touch the current
     // scanline. It can only display 8 sprites per scanline. If more than 8
     // sprites are found, it sets the "sprite overflow" flag.
-    fn find_visible_sprites_for_this_scanline(&mut self) {
+    fn find_visible_sprites_for_next_scanline(&mut self) {
         // Start with an empty list for this scanline.
         self.visible_sprites_this_scanline.clear();
 
