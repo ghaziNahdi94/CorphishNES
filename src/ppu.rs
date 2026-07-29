@@ -898,7 +898,7 @@ impl Ppu {
 
             // Calculate which pixel of the sprite tile we are looking at.
             let mut pixel_column = screen_x - sprite_left_edge;
-            let mut pixel_row = screen_y.wrapping_sub((sprite.y_position_on_screen as usize).wrapping_add(1));
+            let mut pixel_row = screen_y.wrapping_sub((sprite.y_position_on_screen as usize).wrapping_add(2));
 
             // If the pixel is outside the 8x8 tile area, skip this sprite.
             // (This check is mostly defensive; the math above should keep it in range.)
