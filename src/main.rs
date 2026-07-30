@@ -1,4 +1,4 @@
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Scale, Window, WindowOptions};
 use crate::emulator::Emulator;
 
 mod emulator;
@@ -27,10 +27,13 @@ fn main() {
     }
 
     let mut window = Window::new(
-        "NES Emulator",
+        "CorphishNES Emulator",
         WIDTH,
         HEIGHT,
-        WindowOptions::default(),
+        WindowOptions {
+        scale: Scale::X4,
+        ..WindowOptions::default()
+    },
     ).expect("Failed to create window");
 
     window.set_target_fps(60);
@@ -55,6 +58,7 @@ fn main() {
 
         // Get framebuffer and convert to u32 RGB
         let framebuffer = emulator.get_framebuffer();
+
         let buffer: Vec<u32> = framebuffer
             .chunks_exact(3)
             .map(|rgb| {
@@ -64,6 +68,7 @@ fn main() {
                 (r << 16) | (g << 8) | b
             })
             .collect();
+        
 
         window.update_with_buffer(&buffer, WIDTH, HEIGHT)
             .expect("Failed to update window");
