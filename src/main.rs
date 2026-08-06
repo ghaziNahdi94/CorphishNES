@@ -3,6 +3,7 @@ use crate::emulator::Emulator;
 
 mod emulator;
 mod bus;
+mod apu;
 mod cpu;
 mod ppu;
 mod cartridge;

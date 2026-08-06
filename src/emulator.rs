@@ -1,10 +1,11 @@
 use std::io;
 
-use crate::{bus::Bus, cpu::Cpu};
+use crate::{apu::Apu, bus::Bus, cpu::Cpu};
 
 pub struct Emulator {
     cpu: Cpu,
     pub bus: Bus,
+    apu: Apu,
 }
 
 impl Emulator {
@@ -12,6 +13,7 @@ impl Emulator {
         Emulator {
             cpu: Cpu::init(),
             bus: Bus::new(),
+            apu: Apu::new()
         }
     }
 
