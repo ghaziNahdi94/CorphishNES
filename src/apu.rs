@@ -8,7 +8,7 @@ const DUTY_CYCLE_TABLE: [[u8; 8]; 4] = [
 
 const NES_LENGTH_COUNTER_TABLE:[u8; 32] = [10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30];
 
-const FRAME_COUNTER_CPU_MAX_CYCLES: u16 = 7457;
+const MODE_4_STEP_THRESHOLDS: [u16; 4] = [7457, 14913, 22371, 29829];
 
 struct PulseChannel {
     // bit(7) : Duty 1; bit(6): Duty 2; bit(5): Len Halt
@@ -83,7 +83,7 @@ impl PulseChannel {
         self.start_envelope();
     }
 
-    pub fn output(&mut self) -> u8 {
+    pub fn output(&self) -> u8 {
         if self.enabled == false {
             return 0;
         }
@@ -148,7 +148,7 @@ impl PulseChannel {
         }
     }
 
-    fn get_duty_cycle(&mut self) -> [u8; 8] {
+    fn get_duty_cycle(&self) -> [u8; 8] {
         let index = (self.control_register >> 6) & 0b0011;
         DUTY_CYCLE_TABLE[index as usize]
     }
@@ -181,28 +181,45 @@ struct Noise;
 
 struct Dmc;
 
+#[derive(Clone, Copy, PartialEq)]
+enum StepMode {
+    FourSteps,
+    FiveSteps
+}
+
 struct FrameCounter {
-    cycle_counter: u16, //count CPU cycles
+    cpu_cycle_counter: u16, //count CPU cycles
     step: u8,
+    irq_enabled: bool,
+    mode: StepMode,
 }
 
 impl FrameCounter {
     fn new() -> Self {
         Self {
-            cycle_counter: 0,
+            cpu_cycle_counter: 0,
             step: 0,
+            irq_enabled: false,
+            mode: StepMode::FourSteps
         }
     }
 
     fn step(&mut self) -> bool {
-        self.cycle_counter += 1;
+        self.cpu_cycle_counter += 1;
 
-        if self.cycle_counter == FRAME_COUNTER_CPU_MAX_CYCLES {
-            self.cycle_counter = 0;
+        let threshold = MODE_4_STEP_THRESHOLDS[self.step as usize];
+
+        if self.cpu_cycle_counter >= threshold {
             self.step+= 1;
 
-            if self.step > 3 {
+            let max_step = match self.mode {
+                StepMode::FourSteps => 3,
+                StepMode::FiveSteps => 4,
+            };
+
+            if self.step == max_step {
                 self.step = 0;
+                self.cpu_cycle_counter = 0;
             }
 
             return true;
@@ -220,7 +237,8 @@ pub struct Apu {
     dmc: Dmc,
     frame_counter: FrameCounter,
 
-    output_buffer: Vec<f32>
+    sample_counter: f32,
+    audio_buffer: Vec<f32>
 }
 
 impl Apu {
@@ -229,25 +247,85 @@ impl Apu {
             pulse1: PulseChannel::new(),
             pulse2: PulseChannel::new(),
             frame_counter: FrameCounter::new(),
-            output_buffer: Vec::new()
+            triangle: Triangle,
+            noise: Noise,
+            dmc: Dmc,
+            sample_counter: 0f32,
+            audio_buffer: Vec::new()
             //TODO
+        }
+    }
+
+    pub fn save_to_wav(&self, filename: &str) {
+        use hound::{WavSpec, WavWriter, SampleFormat};
+        
+        let spec = WavSpec {
+            channels: 1,
+            sample_rate: 48000,
+            bits_per_sample: 16,
+            sample_format: SampleFormat::Int,
+        };
+        
+        let mut writer = WavWriter::create(filename, spec)
+            .expect("WAV file creation failed !");
+        
+        for &sample in &self.audio_buffer {
+            let i16_sample = (sample * 32767.0) as i16;
+            writer.write_sample(i16_sample).unwrap();
+        }
+        
+        writer.finalize().unwrap();
+    }
+
+    pub fn step_and_collect_sound(&mut self) {
+        self.step();
+
+        self.sample_counter += 1.0;
+        
+        if self.sample_counter >= 37.3 {
+            self.sample_counter -= 37.3;
+            
+            let sample = self.generate_sample();
+            self.audio_buffer.push(sample);
         }
     }
 
     fn step(&mut self) {
         let frame_counter_ticked = self.frame_counter.step();
         if frame_counter_ticked {
+
+            // --- PULSE 1 ---
             self.pulse1.clock_envelope();
 
             if self.frame_counter.step == 1 || self.frame_counter.step == 3 {
                 self.pulse1.clock_length_counter();
             }
+
+            // --- PULSE 2 ---
+            self.pulse2.clock_envelope();
+
+            if self.frame_counter.step == 1 || self.frame_counter.step == 3 {
+                self.pulse2.clock_length_counter();
+            }
         }
 
         self.pulse1.step();
+        self.pulse2.step();
     }
 
-    fn read_cpu(&self, cpu_address: u16) -> u8 {
+    fn generate_sample(&self) -> f32 {
+        let pulse1_out = self.pulse1.output() as f32;
+        let pulse2_out = self.pulse2.output() as f32;
+        
+        // Normalize output between 0.0 et 1.0
+        let mixed = (pulse1_out + pulse2_out) / 30.0; 
+
+        
+        // TODO Triangle, Noise, DMC using Blargg formula
+        mixed.min(1.0) 
+    }
+
+    pub fn read_cpu(&self, cpu_address: u16) -> u8 {
         match cpu_address {
             0x4015 => {
                 //Bits:
@@ -269,7 +347,7 @@ impl Apu {
         }
     }
 
-    fn write_cpu(&mut self, cpu_address: u16, value: u8) {
+    pub fn write_cpu(&mut self, cpu_address: u16, value: u8) {
         match cpu_address {
             0x4000 => self.pulse1.write_to_control_register(value),
             0x4002 => self.pulse1.write_to_time_low_register(value),
@@ -281,6 +359,13 @@ impl Apu {
                 self.pulse1.enabled = value & 0b00000001 != 0;
                 self.pulse2.enabled = value & 0b00000010 != 0;
                 //TODO TRIANGLE DMC NOISE
+            }
+            0x4017 => {
+                let is_irq_enabled = (value >> 6) & 0b00001 != 0;
+                self.frame_counter.irq_enabled = is_irq_enabled;
+
+                let mode = if value >> 7 != 0 { StepMode::FiveSteps } else { StepMode::FourSteps };
+                self.frame_counter.mode = mode;
             }
             _ => {}
         }
