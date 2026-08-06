@@ -3,6 +3,7 @@ use crate::emulator::Emulator;
 
 mod emulator;
 mod bus;
+mod apu;
 mod cpu;
 mod ppu;
 mod cartridge;
@@ -55,6 +56,8 @@ fn main() {
 
         // execute a Frame
         emulator.run_frame();
+
+        emulator.bus.apu.save_to_wav("test_apu.wav");
 
         // Get framebuffer and convert to u32 RGB
         let framebuffer = emulator.get_framebuffer();

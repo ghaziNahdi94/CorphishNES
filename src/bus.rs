@@ -1,10 +1,11 @@
 use std::{io};
-use crate::{cartridge::{Cartridge, Mirroring}, mapper::Mapper, mapper_axrom::MapperAxROM, mapper_cnrom::MapperCNROM, mapper_mmc1::MapperMMC1, mapper_mmc3::MapperMMC3, mapper_nrom::MapperNROM, mapper_unrom::MapperUNROM, ppu::Ppu};
+use crate::{apu::Apu, cartridge::{Cartridge, Mirroring}, mapper::Mapper, mapper_axrom::MapperAxROM, mapper_cnrom::MapperCNROM, mapper_mmc1::MapperMMC1, mapper_mmc3::MapperMMC3, mapper_nrom::MapperNROM, mapper_unrom::MapperUNROM, ppu::Ppu};
 
 pub struct Bus {
     pub ram_cpu: [u8; 2048],
     pub cartridge: Option<Cartridge>,
     pub ppu: Option<Ppu>,
+    pub apu: Apu,
     pub mapper: Option<Box<dyn Mapper>>,
     // === IO / Controllers ===
 
@@ -20,6 +21,7 @@ impl Bus {
             ram_cpu: [0; 2048],
             cartridge: None,
             ppu: None,
+            apu: Apu::new(),
             mapper: None,
             controller_state: [0; 2],
             controller_shift: [0; 2],
@@ -40,7 +42,7 @@ impl Bus {
             0x4000..=0x401F => {
                 match address {
                     // APU Status ($4015) — return 0 (there is no APU)
-                    0x4015 => 0,
+                    0x4015 => self.apu.read_cpu(address),
                 
                     // Controller 1 read ($4016)
                     0x4016 => {
@@ -86,7 +88,7 @@ impl Bus {
                 match address {
                     // APU registers ($4000-$4013, $4015, $4017)
                     0x4000..=0x4013 | 0x4015 | 0x4017 => {
-                        // TODO
+                        self.apu.write_cpu(address, value); 
                     }
                 
                     // === OAMDMA ($4014) ===

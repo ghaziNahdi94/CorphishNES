@@ -31,8 +31,8 @@ impl Emulator {
     }
 
     pub fn run_frame(&mut self) {
-        // 89342 cycles PPU par frame / 3 = 29780.666... cycles CPU
-        // On exécute jusqu'à ce que le PPU ait fait un frame complet
+        // 89342 cycles PPU per frame / 3 = 29780.666... cycles CPU
+        // Execute until PPU complete one Frame
         let mut ppu_cycles_this_frame = 0;
         const PPU_CYCLES_PER_FRAME: usize = 89342; // 262 scanlines * 341 cycles - 1 skipped cycle sur pre-render
     
@@ -50,6 +50,8 @@ impl Emulator {
                 self.bus.ppu.as_mut().unwrap().step();
                 ppu_cycles_this_frame += 1;
             }
+
+            self.bus.apu.step_and_collect_sound();
         }
     }
 }
